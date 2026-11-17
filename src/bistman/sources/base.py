@@ -47,7 +47,8 @@ class FundamentalRow:
 
     ticker: str
     period_end: str  # ISO date; ayrıştırma sınırında tek forma indirgenir
-    statement: str  # 'consolidated' | 'solo'
+    statement: str = "consolidated"  # 'consolidated' | 'solo'
+    statement_type: str = "industrial"  # 'industrial' | 'bank'  (banka -> UFRS şablonu)
     revenue_ttm: float | None = None
     net_income_ttm: float | None = None
     equity: float | None = None

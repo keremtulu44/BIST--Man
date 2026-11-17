@@ -31,7 +31,11 @@ from bistman.triage import Route, route, should_push
         ("DKB", "Kamuyu Aydınlatma Platformu Duyurusu", Route.PIPELINE),
         # DKB, tanınmayan konu -> rutin
         ("DKB", "Şirket Unvan Değişikliği", Route.ROUTINE),
-        # sınıf yok -> fail-open
+        # sınıf YOK (light akışı böyle) — konudan yakalanabilenler yakalanır
+        (None, "Pay Bazında Devre Kesici Bildirimi", Route.MECHANICAL),
+        (None, "Portföy Dağılım Raporu", Route.ROUTINE),
+        (None, "Kamuyu Aydınlatma Platformu Duyurusu", Route.PIPELINE),
+        # sınıf yok ve konu tanınmıyor -> fail-open
         (None, "Bilinmeyen Bir Bildirim", Route.PIPELINE),
         ("XYZ", "Bilinmeyen Sınıf", Route.PIPELINE),
     ],

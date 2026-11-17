@@ -14,10 +14,10 @@ kural tabanlı skorlayan ve bildirim kanallarına dağıtan hat.
 | 1 | borsapy adaptörü + TTM elle doğrulama | ⏳ sırada (ağ gerekir) |
 | 2c | Postgres şeması + dedup + cursor | |
 | 3a | Event study motoru (CAR, z, t0 seçimi) + kalibrasyon ızgarası | ✅ |
-| 3b | Kural skor (`config/scoring.toml`) + Telegram | ⏳ sırada |
-| 4 | Gerçek veriyle kalibrasyon (KAP geçmişi + fiyat) | |
+| 3b | Kural skor (`config/scoring.toml`) + uçtan uca hat + Telegram istemcisi | ✅ |
+| 4 | Gerçek veriyle kalibrasyon (KAP geçmişi + fiyat) | ⏳ sırada |
 
-`pytest`: **124 test**, ağ erişimi gerektirmez.
+`pytest`: **165 test**, ağ erişimi gerektirmez.
 
 ## Dokümanlar
 
@@ -45,6 +45,9 @@ src/bistman/
 │   └── text.py      # tr_lower / name_norm (İ/I tuzağı)
 ├── triage.py        # ÖDA/FR/DKB -> pipeline | fundamentals_refresh | routine | mechanical
 ├── features.py      # oranlar (ciro/PD/net kâr) + çarpımsal confidence cezaları
+├── scoring.py       # impact = konu_prior + oran_bucket; confidence çarpımsal; gerekçe üretir
+├── pipeline.py      # uçtan uca hat: triyaj -> hisse -> oran -> skor -> bildirim
+├── notify.py        # Telegram (parse_mode YOK, 4000'e böler, 429'a uyar) + FakeNotifier
 ├── analysis/
 │   ├── event_study.py   # t0 seçimi, CAR (endeks arındırılmış), z (oynaklık normalize)
 │   └── calibration.py   # eşik × günlük bütçe ızgarası -> isabet/kaçan tablosu
@@ -55,10 +58,11 @@ src/bistman/
     └── kap.py       # firehose: list/light, detail, member_history + retry/backoff
 ```
 
-## Kalibrasyon demosu
+## Demolar
 
 ```bash
-.venv/bin/python scripts/kalibrasyon_tablosu.py   # sentetik veriyle tablo şekli
+.venv/bin/python scripts/hat_demusu.py            # GERÇEK KAP akışı -> skor -> bildirim (ağsız)
+.venv/bin/python scripts/kalibrasyon_tablosu.py   # eşik/bütçe tablosu (sentetik)
 ```
 
 Gerçek veriyle aynı kod çalışır (Faz 4): KAP geçmişi + fiyat serisi -> `ScoredEvent`

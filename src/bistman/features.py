@@ -16,7 +16,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Literal
+from typing import Literal, Mapping
+
+from .parsing.money import best_amount
 
 StatementType = Literal["industrial", "bank"]
 
@@ -69,8 +71,10 @@ class Features:
         """Sıralamada kullanılacak baskın oran: PD varsa PD, yoksa ciro."""
         return self.ratio_mcap if self.ratio_mcap is not None else self.ratio_revenue
 
-    def confidence(self, base: float = 1.0) -> float:
-        return confidence(self.flags, base=base)
+    def confidence(
+        self, base: float = 1.0, penalties: Mapping[str, float] | None = None
+    ) -> float:
+        return confidence(self.flags, base=base, penalties=penalties)
 
 
 def _ratio(part: Decimal | None, whole: Decimal | None) -> float | None:
@@ -93,7 +97,8 @@ def build_features(
     flags: list[str] = list(extra_flags)
 
     if amount_try is None:
-        flags.append("no_amount")
+        if "fx_fallback" not in flags:
+            flags.append("no_amount")
         return Features(
             ticker=ticker,
             amount_try=None,
@@ -131,12 +136,41 @@ def build_features(
     )
 
 
-def confidence(flags: tuple[str, ...] | list[str], *, base: float = 1.0) -> float:
-    """Bayrakları çarpımsal cezaya çevirir; 0..1 aralığına sıkıştırır."""
+def confidence(
+    flags: tuple[str, ...] | list[str],
+    *,
+    base: float = 1.0,
+    penalties: Mapping[str, float] | None = None,
+) -> float:
+    """Bayrakları çarpımsal cezaya çevirir; 0..1 aralığına sıkıştırır.
+
+    `penalties` verilmezse modüldeki varsayılan tablo kullanılır; üretimde
+    `config/scoring.toml`'dan gelen tablo enjekte edilir (kod değil ayar).
+    """
+    table = PENALTIES if penalties is None else penalties
     value = base
     for flag in flags:
-        value *= PENALTIES.get(flag, 1.0)
+        value *= table.get(flag, 1.0)
     return max(0.0, min(1.0, value))
+
+
+def amount_try_from_text(
+    text: str, fx: Mapping[str, Decimal] | None = None
+) -> tuple[Decimal | None, tuple[str, ...]]:
+    """Metinden TRY cinsinden tutar çıkarır; çıkaramazsa (None, bayraklar).
+
+    `fx_fallback`: tutar bulundu ama kur yok (ör. "500 milyon dolar" ve USD/TRY
+    elimizde değil). Uydurma kur yok — bayrak + `None` döneriz.
+    """
+    money = best_amount(text or "", fx)
+    if money is None:
+        return None, ("no_amount",)
+    if money.currency == "TRY":
+        return money.amount, ()
+    converted = money.to_try(fx)
+    if converted is None:
+        return None, ("fx_fallback",)
+    return converted, ()
 
 
 def ratio_bucket(ratio_pct: float | None) -> str:

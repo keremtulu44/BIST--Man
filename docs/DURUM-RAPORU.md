@@ -23,17 +23,17 @@ oturuyor.
 | Commit | 10 |
 | Takip edilen dosya | 38 |
 | Python satırı (src + tests) | 2.474 |
-| Test | **124**, tamamı geçiyor, ağ erişimi yok |
-| Süre | ~0.15 s |
+| Test | **165**, tamamı geçiyor, ağ erişimi yok |
+| Süre | ~0.25 s |
 | Gerçek KAP yanıtı fixture | 2 (`list_light_sample.json`, `detail_1699030.json`) |
 | Dış bağımlılık (runtime) | yok (yalnız `httpx`; `borsapy` Faz 1'de) |
 
 Test dağılımı:
 
 ```
-test_money 21 · test_triage 20 · test_features 18 · test_kap_source 17
-test_event_study 15 · test_ticker_map 9 · test_dates 8 · test_calibration 8
-test_config 4 · test_text 4
+test_money 21 · test_triage 23 · test_features 18 · test_kap_source 17 · test_scoring 16
+test_event_study 15 · test_pipeline_e2e 14 · test_ticker_map 9 · test_dates 8
+test_calibration 8 · test_notify 7 · test_config 4 · test_text 4
 ```
 
 ---

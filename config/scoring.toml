@@ -1,0 +1,53 @@
+# Kural motoru ağırlıkları — KOD DEĞİL, AYAR.
+# Faz 4'teki gerçek kalibrasyon bu dosyayı doldurur (deploy gerekmez).
+# Tüm sayılar geçicidir; "sezgiyle değil tabloyla" ilkesi gereği işaretlenmiştir.
+
+[subject_prior]
+# Konu ne kadar önemli olabilir (impact'e toplamsal katkı, 0-10 ölçeğinde).
+# En uzun eşleşen anahtar kazanır ("bedelli sermaye" > "sermaye").
+"sözleşme" = 2.5
+"ihale" = 2.5
+"yatırım kararı" = 2.0
+"kapasite" = 1.5
+"satın alma" = 2.0
+"birleşme" = 2.5
+"haber ve söylenti" = 1.0
+"pay alım satım" = 0.5
+"temettü" = 1.0
+"kâr dağıtım" = 1.0
+"bedelli" = -1.5
+"bedelsiz" = 0.0
+"dava" = -1.0
+"ceza" = -1.5
+"devre kesici" = 0.0
+"genel kurul" = 0.0
+"varsayılan" = 0.0
+
+[ratio_bucket_points]
+# Oranın büyüklüğü -> impact katkısı (features.ratio_bucket etiketleri)
+"etkisiz" = 0.0
+"kucuk" = 2.0
+"orta" = 4.0
+"buyuk" = 6.5
+"devasa" = 8.5
+"bilinmiyor" = 0.0
+
+[penalties]
+# Emniyet cezaları (çarpımsal). 1.0 = ceza yok.
+"no_amount" = 0.45
+"no_denominator" = 0.50
+"fx_fallback" = 0.70
+"ttm_gap" = 0.60
+"mixed_restatement_vintage" = 0.60
+"bank_template_mismatch" = 0.50
+"implausible_ratio" = 0.25
+"stale_fundamentals" = 0.85
+"llm_low_confidence" = 0.80
+
+[policy]
+push_threshold = 6.5
+digest_threshold = 3.5
+max_push_per_ticker_per_day = 3
+# Büyük ama emin olunamayan haber: saklama, etiketiyle gönder (D20/§3.4)
+uncertain_confidence_below = 0.40
+uncertain_min_impact = 6.0

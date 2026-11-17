@@ -122,8 +122,34 @@ def route(
             return Route.MECHANICAL
         return Route.ROUTINE
 
-    # Sınıf yok / tanınmadı -> kaçırmamak için pipeline
+    # Sınıf YOK: /api/disclosure/list/light bu alanı hiç vermiyor (canlı doğrulandı).
+    # O yüzden konu/özet üzerinden mekanik ve rutin kalıpları yine de yakalarız;
+    # hiçbir kalıba uymuyorsa fail-open (kaçırmak, gürültüden pahalı).
+    if _contains_any(subject_n, _IMPORTANT_DKB_PATTERNS):
+        return Route.PIPELINE
+    if _contains_any(subject_n, _MECHANICAL_PATTERNS) or _contains_any(
+        summary_n, _MECHANICAL_PATTERNS
+    ):
+        return Route.MECHANICAL
+    if _contains_any(subject_n, _ROUTINE_SUBJECTS):
+        return Route.ROUTINE
     return Route.PIPELINE
+
+
+_FUND_MARKERS: tuple[str, ...] = ("portföy", "portfoy", "yatırım fonu", "yatirim fonu", " serbest fon")
+
+
+def looks_like_fund(title: str) -> bool:
+    """Fon/portföy bildirimi mi? (Hisse senedi değil -> unresolved kuyruğunu kirletmesin)
+
+    KAP akışının büyük kısmı fon bildirimi (canlı örnekte 9 kaydın 2'si).
+    Bunları "eşleşmeyen hisse" saymak, gerçekten eşleşmeyen hisseleri gürültü
+    içinde kaybettirir. Ayrı durum: `filtered_fund`.
+    """
+    text = tr_lower(title or "")
+    if any(marker in text for marker in _FUND_MARKERS):
+        return True
+    return text.rstrip().endswith("fonu") or " fon " in text
 
 
 def should_push(route_result: Route) -> bool:
