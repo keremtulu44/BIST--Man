@@ -8,3 +8,4 @@ __pycache__/
 # doğrulama çıktıları (yerel, commit edilmez)
 docs/dogrulama-cikti.txt
 docs/dogrulama-sonuc2.json
+docs/dogrulama-sonuc3.json

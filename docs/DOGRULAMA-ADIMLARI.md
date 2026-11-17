@@ -43,7 +43,28 @@ git pull
 
 ---
 
-## 2. Python ortamı — İKİ YOL VAR
+## 2. Python ortamı — ÜÇ YOL VAR
+
+### Yol 0 (en kolay): HİÇBİR ŞEY KURMA
+
+```powershell
+cd C:\BIST--Man
+python scripts\dogrulama\ttm_dogrula3.py
+```
+
+`ttm_dogrula3.py` **sadece Python standart kütüphanesini** kullanır: pandas yok,
+httpx yok, borsapy yok, pip yok, venv yok. İş Yatırım'ın JSON ucunu doğrudan
+çağırır. Borsapy'nin TTM'ini zaten kullanmıyorduk — paket yalnızca kolaylıktı.
+
+Ağ yoksa mantığı görmek için:
+
+```powershell
+python scripts\dogrulama\ttm_dogrula3.py --demo
+```
+
+---
+
+## 2b. Python ortamı (borsapy ile) — İKİ YOL VAR
 
 ### Yol A (önerilen): tek komut, aktivasyon yok
 
