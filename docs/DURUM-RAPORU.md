@@ -23,17 +23,17 @@ oturuyor.
 | Commit | 10 |
 | Takip edilen dosya | 38 |
 | Python satırı (src + tests) | 2.474 |
-| Test | **165**, tamamı geçiyor, ağ erişimi yok |
-| Süre | ~0.25 s |
+| Test | **204**, tamamı geçiyor, ağ erişimi yok |
+| Süre | ~0.24 s |
 | Gerçek KAP yanıtı fixture | 2 (`list_light_sample.json`, `detail_1699030.json`) |
 | Dış bağımlılık (runtime) | yok (yalnız `httpx`; `borsapy` Faz 1'de) |
 
 Test dağılımı:
 
 ```
-test_money 21 · test_triage 23 · test_features 18 · test_kap_source 17 · test_scoring 16
-test_event_study 15 · test_pipeline_e2e 14 · test_ticker_map 9 · test_dates 8
-test_calibration 8 · test_notify 7 · test_config 4 · test_text 4
+test_money 21 · test_triage 29 · test_kap_table 29 · test_features 18 · test_kap_source 20
+test_scoring 16 · test_event_study 15 · test_pipeline_e2e 14 · test_ticker_map 9
+test_dates 8 · test_calibration 8 · test_notify 7 · test_config 4 · test_text 4
 ```
 
 ---
@@ -52,6 +52,15 @@ okumasıyla teyit edildi; projenin geri kalanını bunlar şekillendirdi.
 | **B5** | Gerçek akışın **%60–75'i gürültü** (devre kesici, MKK kupon/ÖPY, fon bildirimleri); MTRKS'in 1 yıllık 89 kaydında bilgi taşıyan ~%25 | Canlı veri sayımı | Triyaj "lüks" değil, sistemin kendisi |
 | **B6** | Tarih **3 farklı formatta** (light `17.11.2026 15:05:53`, detail `2026.11.17 14:53:07`, tablo `05.11.2026`/`Bugün 14:53`); sınıf JSON'da `ODA`, HTML'de `ÖDA` | Canlı + fixture | Tek normalizasyon noktası şart (`dates.py`, `triage.normalize_class`) |
 | **B7** | `borsapy` tamamen **senkron**, `news`/`balance_sheet`/`ttm_*` **cached_property**, TTM "son 4 çeyreği topla", `get_disclosures` regex'e dayalı ve **boş DataFrame dönebilir** | Wheel indirilip kaynak kodu okundu | 4 tasarım kuralı: to_thread köprüsü, Ticker ömrü, TTM doğrulama, boş=şüpheli |
+| **B8** | Sınıf dağılımı (MTRKS, 1 yıl): **39 DKB · 27 ÖDA · 13 FR · 10 DG**. `DG` (idari form) hiç hesapta yoktu | Gerçek HTML tablo (89 satır) | `DG` → ROUTINE; 89 kaydın **49'u** (DKB+DG) skorlanmadan elenir |
+| **B9** | DKB satırlarında `Kod` sütunu **daima boş** (ihraççı BISTECH); hisse `İlgili Hisseler` sütununda. 6 satırda **o da boş** (12-(4) KAP duyurusu, SPK işlem yasağı, dönüşüm) | Gerçek HTML tablo | Atıf sırası: `Kod` → ilgili hisseler → **üye haritası** (`member_oid`); tablo tek başına yetmiyor |
+| **B10** | 4 satırda **çok sembol** (`BERA+MTRKS`, `KRGYO+MTRKS`): piyasa geneli duyurular | Gerçek HTML tablo | Kalibrasyonda çift atıf = kirli CAR; atıf politikası açık olmalı |
+| **B11** | Bildirim gövdesi düz metin değil **GWT HTML**, her cümle `content-tr` + `content-en` olarak **iki kez** | Gerçek detay yanıtı (22 KB) | İngilizce kopya atılmazsa aynı tutar iki kez görünür; `body_text` %80 küçültüyor |
+| **B12** | Tabloda unvan ve konu **tek hücrede** birleşik; tarih bazen `Bugün 14:53` | Gerçek HTML tablo | Unvan ayrıştırılmazsa eşleştirme şişer; göreli tarih enjekte edilebilir `today` ile çözülür |
+
+**B8 + B9 backfill parser'ını belirledi:** satır şeması artık testle kilitli
+(`tests/test_kap_table.py`, 29 test) — KAP sütun eklerse `KapTableError`, sessizce
+eksik geçmiş yok.
 
 **B2 tek başına planı değiştirdi:** "6 aylık veri çekilemezse kalibrasyon planı
 çöker" varsayımı bitti.

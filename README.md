@@ -15,9 +15,9 @@ kural tabanlı skorlayan ve bildirim kanallarına dağıtan hat.
 | 2c | Postgres şeması + dedup + cursor | |
 | 3a | Event study motoru (CAR, z, t0 seçimi) + kalibrasyon ızgarası | ✅ |
 | 3b | Kural skor (`config/scoring.toml`) + uçtan uca hat + Telegram istemcisi | ✅ |
-| 4 | Gerçek veriyle kalibrasyon (KAP geçmişi + fiyat) | ⏳ sırada |
+| 4 | Gerçek veriyle kalibrasyon (KAP geçmişi ✅ ayrıştırılıyor + fiyat) | ⏳ sırada |
 
-`pytest`: **165 test**, ağ erişimi gerektirmez.
+`pytest`: **204 test**, ağ erişimi gerektirmez.
 
 ## Dokümanlar
 
@@ -40,6 +40,7 @@ python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'
 
 ```
 src/bistman/
+├── parsing/kap_table.py  # geçmiş bildirim tablosu (89 satır) + gövde TR-only metin
 ├── parsing/
 │   ├── money.py     # TR tutar ayrıştırıcı (15.000.000 TL, 1,2 milyar dolar, ₺...)
 │   ├── dates.py     # KAP'ın 3 farklı tarih formatı -> UTC

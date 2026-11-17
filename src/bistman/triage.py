@@ -8,6 +8,12 @@ Sınıf kodları (KAP):
     ÖDA / ODA  Özel Durum Açıklaması  (sözleşme, yatırım, haber/söylenti, insider)
     FR         Finansal Rapor          (bilanço, faaliyet raporu, sorumluluk beyanı)
     DKB        Diğer Bildirimler       (devre kesici, MKK kupon/ÖPY, KAP duyurusu)
+    DG         Diğer                   (formlar: genel bilgi formu, yatırımcı raporu)
+
+DG bulgusu (17.11.2026, gerçek geçmiş tablosu): MTRKS'in 1 yıllık 89 bildiriminin
+10'u DG ve hepsi idari form. Sınıf filtresi kararı buna göre genişletildi:
+DG rutindir — kaydedilir, skorlanmaz. İçeriği fiyat-taşıyan bir DG (sermaye
+artırımı, pay alım-satım vb.) çıkarsa `_DG_ESCALATE` ile hatta alınır.
 
 DİKKAT: API JSON'da sınıf "ODA" gelirken, HTML tabloda "ÖDA" görülür.
 Karşılaştırma daima `tr_lower` + Türkçe karakter eşlemesi ile yapılır.
@@ -22,6 +28,7 @@ from .parsing.text import tr_lower
 CLASS_ODA = "oda"
 CLASS_FR = "fr"
 CLASS_DKB = "dkb"
+CLASS_DG = "dg"
 
 _CLASS_ALIASES = {
     "öda": CLASS_ODA,
@@ -32,6 +39,8 @@ _CLASS_ALIASES = {
     "finansal rapor": CLASS_FR,
     "dkb": CLASS_DKB,
     "diğer bildirimler": CLASS_DKB,
+    "dg": CLASS_DG,
+    "diğer": CLASS_DG,
 }
 
 
@@ -75,9 +84,26 @@ _MECHANICAL_PATTERNS: tuple[str, ...] = (
     "varantların veya sertifikaların işlem görmeye başlaması",
 )
 
+# DG (idari form) ama içeriği fiyat taşıyabilecek istisnalar — hatta alınır
+_DG_ESCALATE: tuple[str, ...] = (
+    "sermaye artırımı",
+    "sermaye azaltımı",
+    "pay alım satım",
+    "pay alım-satım",
+    "kar dağıtımı",
+    "kâr dağıtımı",
+    "temettü",
+)
+
 # DKB olmasına rağmen ÖNEMLİ olan istisnalar (SPK II-15.1 md.12-4 duyurusu vb.)
 _IMPORTANT_DKB_PATTERNS: tuple[str, ...] = (
     "kamuyu aydınlatma platformu duyurusu",
+    # Gerçek geçmiş tablosunda görüldü (MTRKS, 30.12.2025): işlem yasağı bir
+    # piyasa olayı, mekanik gürültü değil.
+    "i̇şlem yasağı",
+    "işlem yasağı",
+    "işlem yasagi",
+    "tedbir kararı",
 )
 
 
@@ -120,6 +146,11 @@ def route(
             summary_n, _MECHANICAL_PATTERNS
         ):
             return Route.MECHANICAL
+        return Route.ROUTINE
+
+    if cls == CLASS_DG:
+        if _contains_any(subject_n, _DG_ESCALATE):
+            return Route.PIPELINE
         return Route.ROUTINE
 
     # Sınıf YOK: /api/disclosure/list/light bu alanı hiç vermiyor (canlı doğrulandı).

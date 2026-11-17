@@ -23,7 +23,7 @@ import asyncio
 import json
 import random
 from collections.abc import Callable
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 import httpx
@@ -247,15 +247,32 @@ class KapClient:
         return parse_detail(response.content)
 
     async def member_history_raw(self, member_oid: str) -> str:
-        """Üye bazlı geçmiş (varsayılan 1 yıl) — HAM HTML döner.
+        """Üye bazlı geçmiş (varsayılan 1 yıl) — HAM HTML.
 
-        Tablo ayrıştırıcısı henüz yok: gerçek HTML'i bir kez kaydedip
-        `tests/fixtures/kap/` altına koymadan güvenilir parser yazılmaz.
-        Satır şeması (gözlem): sıra no | tarih+saat | ticker | unvan+konu |
-        sınıf (ÖDA/FR/DKB) | konu | özet | ilgili hisseler (+N) | yıl | dönem
+        Ayrıştırma `parsing.kap_table.parse_history`'de; bu metot sadece indirir.
+        Tek istek = 1 yıllık tam geçmiş (17.11.2026 doğrulandı: 89 bildirim).
         """
         response = await self._get(f"{MEMBER_HISTORY_PATH}?member={member_oid}")
         return response.text
+
+    async def fetch_history(self, member_oid: str, *, today: date | None = None) -> list:
+        """Üye geçmişini ayrıştırılmış satırlar olarak döndürür (backfill birimi)."""
+        from ..parsing.kap_table import parse_history
+
+        raw = await self.member_history_raw(member_oid)
+        return parse_history(raw, today=today)
+
+    async def fetch_body(self, index: int) -> tuple[str, DisclosureDetail]:
+        """Bildirim gövdesini **düz metin** olarak indirir (pipeline `body_provider`'ı).
+
+        Gövde HTML'i TR + EN iki kopya içeriyor; düz metne çevrilirken İngilizce
+        kopya atılır (aynı tutarın iki kez görünmemesi için). Ağ maliyeti:
+        bildirim başına 1 istek — yalnız adaylar için çağrılmalı.
+        """
+        from ..parsing.kap_table import body_text
+
+        detail = await self.detail(index)
+        return body_text(detail.body_html), detail
 
 
 def _retry_after_seconds(response: httpx.Response) -> float | None:

@@ -1,7 +1,7 @@
 """KAP firehose testleri — ağ YOK, gerçek fixture + httpx.MockTransport."""
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import httpx
@@ -177,5 +177,60 @@ def test_client_sends_identifying_user_agent() -> None:
         async with _client(handler) as kap:
             await kap.light()
         assert "bistman" in seen["ua"]
+
+    asyncio.run(run())
+
+
+# --------------------------------------------------- gövde: düz metin (body_provider)
+
+
+def test_fetch_body_returns_turkish_only_text() -> None:
+    """`fetch_body` pipeline'a HAZIR metin vermeli: İngilizce kopya ve GWT işaretleri yok."""
+    detail_bytes = (FIXTURES / "detail_1699030_live.json").read_bytes()
+
+    async def run() -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert "attachment-detail/1699030" in str(request.url)
+            return httpx.Response(200, content=detail_bytes)
+
+        async with _client(handler) as kap:
+            text, detail = await kap.fetch_body(1699030)
+
+        assert "Haber veya Söylentilere İlişkin Açıklama" in text
+        assert "Notification About News Or Rumours" not in text
+        assert "oda_ExplanationTextBlock|" not in text
+        assert len(text) < 6000  # ham HTML 22 KB; TR-only ~4 KB
+        assert detail.stub.tickers == ("MTRKS",)
+
+    asyncio.run(run())
+
+
+def test_fetch_history_parses_real_fixture() -> None:
+    """Backfill birimi: tek istek -> 1 yıl -> ayrıştırılmış satırlar."""
+    history_html = (FIXTURES / "member_history_mtrks.html").read_bytes()
+
+    async def run() -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert "bildirim-sorgu-sonuc?member=" in str(request.url)
+            return httpx.Response(200, content=history_html)
+
+        async with _client(handler) as kap:
+            rows = await kap.fetch_history("8acae2c575a1b5b60177de29c7177130", today=date(2026, 11, 17))
+
+        assert len(rows) == 89
+        assert rows[0].index == 1699030
+        assert {r.disclosure_class for r in rows} == {"öda", "fr", "dkb", "dg"}
+
+    asyncio.run(run())
+
+
+def test_fetch_body_propagates_parse_error() -> None:
+    async def run() -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, content=b'[{"disclosure": {}}]')
+
+        async with _client(handler) as kap:
+            with pytest.raises(KapParseError):
+                await kap.fetch_body(1)
 
     asyncio.run(run())

@@ -6,5 +6,4 @@ __pycache__/
 .env
 
 # doğrulama çıktıları (yerel, commit edilmez)
-docs/dogrulama-sonuc.json
 docs/dogrulama-cikti.txt

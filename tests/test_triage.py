@@ -2,7 +2,7 @@
 
 import pytest
 
-from bistman.triage import Route, route, should_push
+from bistman.triage import Route, normalize_class, route, should_push
 
 
 @pytest.mark.parametrize(
@@ -60,3 +60,28 @@ def test_turkish_suffix_tolerance() -> None:
     """'Genel Kurul' ve 'Genel Kurul İşlemlerine İlişkin' ikisi de rutin olmalı."""
     assert route("ODA", "Genel Kurul") is Route.ROUTINE
     assert route("oda", "genel kurul işlemlerine ilişkin bildirim") is Route.ROUTINE
+
+
+# --------------------------------------------------------------- DG (idari form)
+
+
+@pytest.mark.parametrize(
+    "subject",
+    ["Şirket Genel Bilgi Formu", "Yatırımcı Raporu", "Katılım Finansı İlkeleri Bilgi Formu"],
+)
+def test_dg_class_is_routine(subject: str) -> None:
+    """Gerçek geçmişte DG = idari form; skorlanmaz (kaydedilir)."""
+    assert normalize_class("DG") == "dg"
+    assert route("DG", subject) is Route.ROUTINE
+
+
+@pytest.mark.parametrize("subject", ["Sermaye Artırımı", "Kâr Dağıtımı", "Pay Alım Satım Bildirimi"])
+def test_dg_class_escalates_when_price_relevant(subject: str) -> None:
+    """DG olmasına rağmen fiyat taşıyan konu hatta alınır (fail-open korunuyor)."""
+    assert route("DG", subject) is Route.PIPELINE
+
+
+def test_spk_trading_ban_is_not_mechanical() -> None:
+    """Gerçek veride görüldü: SPK işlem yasağı DKB sınıfında ama piyasa olayı."""
+    assert route("DKB", "SPK İşlem Yasağı Nedeniyle Pay Duyurusu") is Route.PIPELINE
+    assert route("DKB", "Kamuyu Aydınlatma Platformu Duyurusu") is Route.PIPELINE
