@@ -77,6 +77,7 @@ okumasıyla teyit edildi; projenin geri kalanını bunlar şekillendirdi.
 | **B26** | Kalibrasyon hattı uçtan uca bağlandı, ama **gerçek veride skorlar sıfıra çöküyor** — çünkü geçmiş tablosunda **tutar yok** | `backfill.py` + `scripts/kalibrasyon_gercek.py` `--dry-run` | Eşiği ölçmek için gövde indirmek şart; 89 satırlık fixture'da medyan skor 0.00 |
 | **B27** | MTRKS sayfasındaki 'İŞ PORTFÖY … / IDH, IEV, …, MTRKS' satırının `Kod` sütunu **ISP** yazıyor: ihraççı fon, konu MTRKS. Eski atıf bu satırları MTRKS'ten siliyordu | `attribute_ticker` (üye kodu kazanır) + başlık sembol listesi | 3 satır MTRKS'e döndü; 3 fon-akışı satırı sayılarak dışlandı |
 | **B28** | Haber davranışı denetlendi: 23 pipeline satırının **19'u konu önseline uymuyor**; konkordato/yangın/işlem yasağı gibi tutarsız maddi haberler `impact 0` ile sessiz; döviz tutarları `fx_fallback` ile kör; günlük push bütçesi kodda uygulanmıyor | `scripts/haber_davranisi.py` + `docs/HABER-DAVRANISI.md` | 10 bulgu, 4'ü kod hatası, 2'si tasarım kararı bekliyor |
+| **B29** | 'Önem' denetlendi: `impact` tek sayıda konu + **yön** + maddiyatı taşıyor. Büyüklük konuyu 3.4× eziyor; 21 impact değerinin 18'i birden çok anlama geliyor; negatif önsel (ceza/bedelli) kötü haberi **susturuyor** | `scripts/onem_denetimi.py` (6 deney) + `docs/ONEM-DENETIMI.md` | Spearman: %100 altı +0.89, tüm aralık +0.19; 215/576 çift ters sıralı |
 
 **B13 projenin en pahalı hatasını önledi:** doğrulama olmasaydı sistem "her haber
 küçük" diye susacak, kimse nedenini anlamayacaktı — çünkü kod çalışıyor, testler

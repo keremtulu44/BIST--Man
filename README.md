@@ -25,6 +25,7 @@ kural tabanlı skorlayan ve bildirim kanallarına dağıtan hat.
 - **[docs/GERCEK-VERI-RAPORU.md](docs/GERCEK-VERI-RAPORU.md)** — **gerçek veriyle ne ölçüldü, ne düzeltildi** (tek sayfa)
 - **[docs/DOGRULAMA-ADIMLARI.md](docs/DOGRULAMA-ADIMLARI.md)** ← **senin yapacağın 2 doğrulama (PowerShell komutları)**
 - **[docs/HABER-DAVRANISI.md](docs/HABER-DAVRANISI.md)** — sistem bir habere ne yapıyor: 10 bulgu, kanıtlı
+- **[docs/ONEM-DENETIMI.md](docs/ONEM-DENETIMI.md)** — "önem" tek sayıda üç şeyi taşıyor: kanıtlı denetim
 - **[docs/PLAN-V1.md](docs/PLAN-V1.md)** — v1 planı: evren, kalibrasyon yöntemi, fazlar
 - **[docs/MIMARI.md](docs/MIMARI.md)** — yazılım mimarisi, veri modeli, hata kataloğu
 - **[docs/TASARIM-DETAY.md](docs/TASARIM-DETAY.md)** — skor modeli, state machine, replay, karar kaydı
@@ -73,6 +74,7 @@ src/bistman/
 .venv/bin/python scripts/kalibrasyon_tablosu.py   # eşik/bütçe tablosu (sentetik)
 .venv/bin/python scripts/kalibrasyon_gercek.py --dry-run  # Faz 4 hattı, ağ olmadan
 .venv/bin/python scripts/haber_davranisi.py      # haberlere nasıl davranıyor (bulgular)
+.venv/bin/python scripts/onem_denetimi.py        # önem/sıralama denetimi (6 deney)
 ```
 
 Gerçek veriyle aynı kod çalışır (Faz 4): KAP geçmişi + fiyat serisi -> `ScoredEvent`
