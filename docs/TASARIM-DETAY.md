@@ -14,8 +14,8 @@
 | D2 | Kuyruk | Postgres `FOR UPDATE SKIP LOCKED` | ✅ kesin |
 | D3 | Dedup | DB unique constraint (bellek değil) | ✅ kesin |
 | D4 | Skor şeması | 3 eksen: `impact / sentiment / confidence` | ✅ kesin (§3) |
-| D5 | Bilanço kaynağı | İş Yatırım ana + KAP çeyreklik çapraz kontrol | ⏳ spike bekliyor (§2) |
-| D6 | Bildirim akışı kaynağı | **KAP zorunlu**, alternatifi yok | ✅ kesin |
+| D5 | Bilanço kaynağı | MKK KAP ürünü (varsa) → İş Yatırım `MaliTablo` + KAP çapraz kontrol | ⏳ erişim deneyi (VERI-KAYNAKLARI §6) |
+| D6 | Bildirim akışı kaynağı | **MKK API Portal** birincil, KAP iç API yedek → [VERI-KAYNAKLARI.md](VERI-KAYNAKLARI.md) | ✅ kesin |
 | D7 | Ciro bazı | TTM + aynı enflasyon düzeltme "vintage"ı | ✅ kesin (§2.3) |
 | D8 | Bildirim politikası | 3 kademe (anında / günlük özet / sadece DB) | ✅ kesin (§3.4) |
 | D9 | LLM sağlayıcı | Arayüz sabit, sağlayıcı değişken; seçim golden set ile | ⏳ eval bekliyor (§6) |
