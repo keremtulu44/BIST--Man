@@ -29,6 +29,10 @@
 | D17 | Emtia | ayrı alarm akışı; hisse skoruyla aynı ölçekte DEĞİL | ✅ kesin (PLAN-V1 §1) |
 | D18 | LLM | v1'de yok; Faz 7'de Gemini/kendi wrapper | ✅ kesin |
 | D19 | Kanal | Telegram (v1) → web (Faz 6) | ✅ kesin |
+| D20 | Triyaj kapsamı | ÖDA + FR; DKB'den yalnız "KAP Duyurusu"; devre kesici = sayaç | ✅ kesin (PLAN-V1 §6.5) |
+| D21 | Zamanlama | Seans içi anında, dışı 09:15 sabah özeti, gece sessiz | ✅ kesin |
+| D22 | Emtia paneli | 7 enstrüman (config/universe.toml) | ✅ kesin |
+| D23 | Backfill yolu | `bildirim-sorgu-sonuc?member=OID` (1 yıl, 50 istek) — `byCriteria` yok | ✅ kesin, canlı doğrulandı |
 
 ---
 

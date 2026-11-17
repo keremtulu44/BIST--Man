@@ -1,16 +1,50 @@
 # BIST--Man
 
-KAP bildirimlerini gerçek zamanlı izleyip, şirket finansallarıyla birleştiren,
-LLM ile skorlayan ve bildirim kanallarına dağıtan arka plan sistemi.
+KAP bildirimlerini izleyip BIST 50 şirketlerinin finansallarıyla birleştiren,
+kural tabanlı skorlayan ve bildirim kanallarına dağıtan hat.
+**Kişisel/eğitim amaçlı** (veri: borsapy, ticari kullanım lisansı yok).
+
+## Durum
+
+| Faz | İçerik | Durum |
+|---|---|---|
+| 0 | Saf ayrıştırma + triyaj + config (`pytest`: 53 test) | ✅ |
+| 1 | borsapy adaptörü + fixture + elle doğrulama | ⏳ sırada |
+| 2 | KAP firehose + DB + dedup | |
+| 3–5 | Features, fiyat/event study, kural skor, Telegram | |
 
 ## Dokümanlar
 
-- **[docs/PLAN-V1.md](docs/PLAN-V1.md)** ← **v1 planı: BIST 50 + endeks + emtia, kural tabanlı, 6 aylık veriyle kalibre**
-- **[docs/MIMARI.md](docs/MIMARI.md)** — yazılım mimarisi, veri modeli, hata kataloğu, faz planı
-- **[docs/VERI-KATMANI-BORSAPY.md](docs/VERI-KATMANI-BORSAPY.md)** — aktif veri katmanı: borsapy + 4 sessiz tuzak
-- **[docs/VERI-KAYNAKLARI.md](docs/VERI-KAYNAKLARI.md)** — kaynak referansı: resmî API'ler, lisanslar
-- **[prototype/money_parser.py](prototype/money_parser.py)** — Türkçe tutar ayrıştırıcı prototipi
+- **[docs/PLAN-V1.md](docs/PLAN-V1.md)** — v1 planı: evren, kalibrasyon yöntemi, fazlar
+- **[docs/MIMARI.md](docs/MIMARI.md)** — yazılım mimarisi, veri modeli, hata kataloğu
+- **[docs/TASARIM-DETAY.md](docs/TASARIM-DETAY.md)** — skor modeli, state machine, replay, karar kaydı
+- **[docs/VERI-KATMANI-BORSAPY.md](docs/VERI-KATMANI-BORSAPY.md)** — veri katmanı + 4 sessiz tuzak
+- **[docs/VERI-KAYNAKLARI.md](docs/VERI-KAYNAKLARI.md)** — kaynak referansı (resmî API'ler, lisanslar)
+
+## Kullanım
 
 ```bash
-python3 prototype/money_parser.py     # 13/13 öz test
+python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'
+.venv/bin/pytest                      # ağ erişimi gerektirmez
 ```
+
+## Yapı
+
+```
+src/bistman/
+├── parsing/
+│   ├── money.py     # TR tutar ayrıştırıcı (15.000.000 TL, 1,2 milyar dolar, ₺...)
+│   ├── dates.py     # KAP'ın 3 farklı tarih formatı -> UTC
+│   └── text.py      # tr_lower / name_norm (İ/I tuzağı)
+├── triage.py        # ÖDA/FR/DKB -> pipeline | fundamentals_refresh | routine | mechanical
+├── config.py        # config/universe.toml yükleyici
+└── sources/base.py  # Protocol'ler (DisclosureFeed, FundamentalsSource, UniverseSource)
+```
+
+## Tasarım kuralları (kısaca)
+
+1. **Dedup DB'de**, bellekte değil (`ON CONFLICT DO NOTHING`).
+2. **Kuyruk Postgres** (`FOR UPDATE SKIP LOCKED`) — Redis/Celery yok.
+3. **LLM aritmetik yapmaz**; oranlar kodda hesaplanır.
+4. **Boş sonuç = şüpheli**, "haber yok" değil → boşluk alarmı.
+5. **Sessiz yanlış, gürültülü hatadan kötüdür**: tanınmayan format hata fırlatır.

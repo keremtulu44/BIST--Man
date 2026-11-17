@@ -89,28 +89,38 @@ Bu yüzden bu deney "kalibrasyon" değil, **"devam/iptal kararı"**.
 
 ---
 
-## 3. EN BÜYÜK BİLİNMEYEN: 6 aylık bildirim geçmişini çekebilir miyiz?
+## 3. ~~EN BÜYÜK BİLİNMEYEN~~ → **ÇÖZÜLDÜ (2026-11-17, canlı test)**
 
-Bunu planın en başına koyuyorum çünkü **cevap "hayır" ise bütün §2 çöker.**
+6 aylık/1 yıllık bildirim geçmişi **tek GET ile** çekilebiliyor. `byCriteria`
+POST'una, bot korumasıyla boğuşmaya gerek yok:
 
-| Yol | Ne verir | Risk |
+```
+GET https://www.kap.org.tr/tr/bildirim-sorgu-sonuc?member={memberOid}
+  -> Örnek (MTRKS): "Başlangıç Tarihi: 17-11-2025  Bitiş Tarihi: 17-11-2026"
+                    "89 bildirim bulundu."
+  -> Tabloda: tarih+saat, ticker, unvan+konu, sınıf (ÖDA/FR/DKB), özet,
+              ilgili hisseler (çok hisselide "+6" ile kısaltılır), yıl, dönem
+```
+
+**Backfill maliyeti: 50 hisse × 1 istek = 50 istek ≈ 1 yıllık veri.** Süre: ~1 dk.
+
+Doğrulanan diğer iki uç:
+
+| Uç | Ne verir | Sınırı |
 |---|---|---|
-| KAP `list/light` | **sadece bugün** | 6 ay geriye gidilemez |
-| KAP `byCriteria` (tarih aralığı, POST) | 7 günlük pencereler → 26 istek | **bot koruması (HTTP 666) tarih sorgusunda görülmüş** |
-| `Ticker.news` | hisse başına **son 20** | 50 hisse × 20 = 1.000 kayıt; 6 ayın tamamı değil |
-| borsapy `get_disclosure_content(idx)` | tek bildirim gövdesi | ID elimizde olmalı |
+| `GET /tr/api/disclosure/list/light` | bugünün tüm akışı: `subject`, `summary`, `title`, `publishDate`, `disclosureIndex` | **ticker YOK** (sadece unvan) → unvan→kod eşlemesi şart |
+| `GET /tr/api/notification/attachment-detail/{index}` | `stockCode`, `relatedStocks`, `disclosureClass`, saniyeli tarih, gövde | bildirim başına 1 istek → sadece filtre geçenler için |
 
-**Karar: önce bunu test et.** Sıra:
-1. `byCriteria` ile 1 haftalık pencere (Referer + kendi UA + önce `bildirim-sorgu`
-   ısıtması). Çalışırsa 26 pencereye çıkar, aralarda 2-3 sn bekle.
-2. Engellenirse: 3 aya düş (13 pencere) → hâlâ engel → `Ticker.news` ile 50 hisse
-   (son 20'şer) → o da yetmezse **kararı 6 ay yerine "son 1 ay tam + sürekli canlı
-   biriktirme"** modeline çevir (sistem çalıştıkça veri birikir, 3 ay sonra karar veririz).
+**Gerçek veriden çıkan triyaj dersi:** MTRKS'in 1 yıllık 89 bildiriminin ~13'ü
+devre kesici, ~6'sı kupon/ÖPY, 1'i çok şirketli KAP duyurusu → **bilgi taşıyan
+~%25.** Ön filtre lüks değil, sistemin kendisi.
 
-> Bu, projenin **en ucuz ve en kritik** deneyi: 1 script, ~30 dakika. Yanıtı
-> bilmeden Faz 2'ye geçmek riskli.
+**Tarih formatı tuzağı (üç farklı format aynı platformdan):**
+`17.11.2026 15:05:53` (light) · `2026.11.17 14:53:07` (detail) ·
+`05.11.2026` + `Bugün 14:53` (tablo). Tek normalizasyon: `parsing/dates.py`.
 
----
+**Sınıf yazımı tuzağı:** JSON'da `"ODA"`, HTML tabloda `"ÖDA"`. `tr_lower` +
+alias tablosu olmadan eşleşmez → `triage.normalize_class`.
 
 ## 4. Skor v1 (LLM'siz) — kesinleşen formüller
 
@@ -166,13 +176,24 @@ push_score  = impact × confidence        → eşik §2.2'den
 
 ---
 
+## 6.5 Kesinleşen v1 kararları
+
+| Konu | Karar | Gerekçe |
+|---|---|---|
+| Kapsam | **ÖDA + FR, DKB'den sadece "KAP Duyurusu" istisnası** | Gerçek veride DKB'nin ~%95'i mekanik; ÖDA sinyalin tamamı |
+| Devre kesici | Bildirim değil **sayaç**: aynı hissede gün içi ≥3 → ayrı uyarı | Tek başına bilgi değeri yok, kümeleşmesi bilgi |
+| Zamanlama | Seans içi (09:30–18:15) anında; dışı birikip **09:15 sabah özeti** | Gece bildirimi yok |
+| Geçmiş derinliği | **1 yıl** (varsayılan pencere, ekstra istek yok) | ~2.000–4.000 olay; 2 yıl gerekirse sonra |
+| Emtia | **7 enstrümanlı panel**: gram/ons altın, gram gümüş, Brent, USD/TRY, XU100, XBANK | Kullanıcı seçimi; Brent USD → TL çevrimi zorunlu |
+| Telegram | Kullanıcı kendi kuracak (acil değil) | v1 DB + log ile de çalışır |
+
 ## 7. Açık bilinmeyenler (önem sırasına göre)
 
 | # | Bilinmeyen | Neden kritik | Nasıl çözülür |
 |---|---|---|---|
-| 1 | 6 aylık bildirim geçmişi çekilebiliyor mu | Tüm kalibrasyon planı buna bağlı | Faz 2, 30 dk |
-| 2 | `byCriteria` yanıt şeması (alan adları) | Parser'ın temeli | Aynı deney, ham yanıt fixture'a |
-| 3 | BIST 50 üye listesi nereden güncel gelir | Evrenin tanımı | `Index("XU050")` bileşen veriyor mu? Yoksa config + çeyreklik elle |
+| ~~1~~ | ~~6 aylık bildirim geçmişi~~ | ✅ ÇÖZÜLDÜ: `bildirim-sorgu-sonuc?member=` 1 yıl veriyor | — |
+| ~~2~~ | ~~`byCriteria` şeması~~ | ✅ GEREKMİYOR: tüm ihtiyaç GET uçlarında | — |
+| 3 | BIST 50 üye listesi | Evrenin tanımı | `Index("XU050").component_symbols` VAR (koddan doğrulandı) ama boş dönebilir → config fallback |
 | 4 | borsapy TTM = KAP raporu mu | Tüm oranlar buna bağlı | Faz 1 elle doğrulama |
 | 5 | Fiyat verisi 6 ay geriye sağlıklı mı (TradingView) | Event study girdisi | Faz 4, 50 hisse × 6 ay çekip boşluk say |
 | 6 | KAP yayın saati hassasiyeti (saniye) | t0 seçimi / event study | Fixture'da `publishDate` formatı: `YYYY.MM.DD HH:MM:SS` |

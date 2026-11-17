@@ -1,14 +1,14 @@
-"""
-Prototip: Türkçe finans metinlerinden parasal tutar çıkarımı.
+"""Türkçe finans metinlerinden parasal tutar çıkarımı.
 
-Sistemin en yüksek hata riski taşıyan saf fonksiyonu. Ağ/DB/LLM bağımlılığı yok.
-Hedef modül: src/bistman/parsing/money.py
+Sistemin en yüksek hata riski taşıyan saf fonksiyonu: ağ/DB/LLM bağımlılığı YOK.
+Testleri: tests/test_money.py
 
 Tasarım kuralı:
     Para birimi (TL/USD/EUR...) VEYA büyüklük kelimesi (bin/milyon/milyar)
     yoksa sayı TUTAR SAYILMAZ.  "2024 yılında", "%12,5", "1.234 adet" -> elenir.
 
-Çalıştırma:  python prototype/money_parser.py
+FX notu: `to_try()` yalnızca verilen kur sözlüğüyle çevirir. Kur yoksa None döner
+(uydurma kur yok). Çağıran katman (features.py) bunu confidence cezasına çevirir.
 """
 
 from __future__ import annotations
@@ -177,62 +177,3 @@ def best_amount(text: str, fx: dict[str, Decimal] | None = None) -> Money | None
         return (1 if try_try is not None else 0, try_try or m.amount)
 
     return max(candidates, key=key)
-
-
-# --- Öz testler ------------------------------------------------------------
-
-CASES: list[tuple[str, str | None, str | None]] = [
-    # (metin, beklenen tutar (TRY bazında string) | None, not)
-    ("Şirketimiz 15.000.000.000 TL tutarında yeni sözleşme imzalamıştır.", "15000000000", "binlik gruplu TRY"),
-    ("1,2 milyar TL tutarında yatırım kararı alınmıştır.", "1200000000", "virgül ondalık + milyar"),
-    ("500 milyon dolar tutarında kredi sağlanmıştır.", "500000000", "USD, FX gerekir"),
-    ("1.234,56 TL ceza kesilmiştir.", "1234.56", "TR ondalık"),
-    ("%12,5 oranında artış beklenmektedir.", None, "yüzde -> tutar değil"),
-    ("2024 yılında faaliyetlerine devam etmiştir.", None, "yıl -> tutar değil"),
-    ("Yönetim Kurulu 12 üyeden oluşmaktadır.", None, "aded -> tutar değil"),
-    ("3.5 milyar TL'lik ihale kazanıldı.", "3500000000", "EN formatı sızması, uyarı"),
-    ("Şirket 250 bin TL sermaye artırımı yapacaktır.", "250000", "bin"),
-    ("₺1.500.000 bedelli sermaye artırımı yapılacaktır.", "1500000", "önek sembol"),
-    ("1.234 adet pay satılmıştır.", None, "adet -> tutar değil"),
-    ("17.11.2026 tarihli açıklama.", None, "tarih -> tutar değil"),
-    ("Haber metninde hiç tutar yok.", None, "boş durum"),
-]
-
-FX_TEST = {"USD": Decimal("34.50")}
-
-
-def _selftest() -> int:
-    failed = 0
-    print(f"{'DURUM':6} {'METİN':52} {'BULUNAN':28} NOT")
-    print("-" * 120)
-    for text, expected, note in CASES:
-        m = best_amount(text, FX_TEST)
-        got = m.amount if m is not None else None
-        shown = "-" if m is None else f"{m.amount} {m.currency}"
-        if m is not None and m.currency != "TRY":
-            tr = m.to_try(FX_TEST)
-            shown += f" (~{tr} TRY)"
-
-        exp = None if expected is None else Decimal(expected)
-        ok = (got is None and exp is None) or (
-            got is not None and exp is not None and got == exp
-        )
-        if not ok:
-            failed += 1
-        print(f"{'OK' if ok else 'FAIL':6} {text[:50]:52} {shown[:40]:42} {note}")
-        if not ok:
-            print(f"       beklenen={exp} bulunan={got}")
-        if m is not None and m.warnings:
-            print(f"       uyarilar={list(m.warnings)}")
-
-    # Ekstra kontrol: uyarı üretimi
-    m = best_amount("3.5 milyar TL'lik ihale", FX_TEST)
-    assert m and "en_format_decimal:3.5" in m.warnings, m
-
-    print("-" * 120)
-    print(f"{len(CASES) - failed}/{len(CASES)} geçti")
-    return 0 if failed == 0 else 1
-
-
-if __name__ == "__main__":
-    raise SystemExit(_selftest())

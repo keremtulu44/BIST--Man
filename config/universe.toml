@@ -1,0 +1,76 @@
+# v1 evreni — doğrulanmış borsapy sembolleri (kaynak kodu okunarak teyit edildi)
+# Karar: PLAN-V1 §1, D15
+
+[stocks]
+# BIST 50 üyeleri çalışma zamanında `Index("XU050").component_symbols` ile çekilir.
+# Boş/eksik dönerse (borsapy sessizce [] dönebilir) `fallback_file` kullanılır.
+source = "index:XU050"
+refresh = "daily"
+fallback_file = "config/universe_fallback.txt"
+
+[market_reference]
+# Skor/formül referansı — ayrı sinyal değil
+indices = ["XU100", "XBANK"]
+
+[commodities]
+# Kullanıcı seçimi: geniş panel (7 enstrüman)
+# `kind`: fx -> bp.FX(symbol), index -> bp.Index(symbol)
+# `quote_ccy`: fiyatın para birimi. USD ise TL'ye çevirmek için USD/TRY gerekir
+#             (yoksa "altın düştü" yanılgısı: TL bazında yükselmiş olabilir).
+[[commodities.instruments]]
+kind = "fx"
+symbol = "gram-altin"
+label = "Gram Altın"
+quote_ccy = "TRY"
+
+[[commodities.instruments]]
+kind = "fx"
+symbol = "ons-altin"
+label = "Ons Altın"
+quote_ccy = "TRY"
+
+[[commodities.instruments]]
+kind = "fx"
+symbol = "gram-gumus"
+label = "Gram Gümüş"
+quote_ccy = "TRY"
+
+[[commodities.instruments]]
+kind = "fx"
+symbol = "BRENT"
+label = "Brent Petrol"
+quote_ccy = "USD"
+tl_conversion_required = true
+
+[[commodities.instruments]]
+kind = "fx"
+symbol = "USD"
+label = "USD/TRY"
+quote_ccy = "TRY"
+
+[[commodities.instruments]]
+kind = "index"
+symbol = "XU100"
+label = "BIST 100"
+quote_ccy = "TRY"
+
+[[commodities.instruments]]
+kind = "index"
+symbol = "XBANK"
+label = "BIST Banka"
+quote_ccy = "TRY"
+
+[commodity_alerts]
+# Emtia ayrı akış: hisse `impact` skoruyla AYNI ölçekte değil (D17)
+method = "sigma"
+sigma_window_days = 20
+alert_sigma = 2.0
+quiet_hours_trt = ["23:00", "08:00"]
+
+[disclosure]
+# Triage kapsamı (D20): ÖDA + FR zorunlu, DKB'den sadece önemli istisnalar
+push_routes = ["pipeline"]
+digest_routes = ["fundamentals_refresh"]
+poll_interval_seconds_market = 15
+poll_interval_seconds_offhours = 60
+poll_interval_seconds_night = 300
