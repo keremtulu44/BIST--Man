@@ -1,0 +1,238 @@
+"""
+Prototip: Türkçe finans metinlerinden parasal tutar çıkarımı.
+
+Sistemin en yüksek hata riski taşıyan saf fonksiyonu. Ağ/DB/LLM bağımlılığı yok.
+Hedef modül: src/bistman/parsing/money.py
+
+Tasarım kuralı:
+    Para birimi (TL/USD/EUR...) VEYA büyüklük kelimesi (bin/milyon/milyar)
+    yoksa sayı TUTAR SAYILMAZ.  "2024 yılında", "%12,5", "1.234 adet" -> elenir.
+
+Çalıştırma:  python prototype/money_parser.py
+"""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
+
+# --- Sabitler ---------------------------------------------------------------
+
+MAGNITUDE = {
+    "bin": Decimal(10) ** 3,
+    "milyon": Decimal(10) ** 6,
+    "milyar": Decimal(10) ** 9,
+    "trilyon": Decimal(10) ** 12,
+}
+
+CURRENCY = {
+    "tl": "TRY", "try": "TRY", "₺": "TRY", "türk lirası": "TRY",
+    "usd": "USD", "dolar": "USD", "$": "USD", "abd doları": "USD",
+    "eur": "EUR", "euro": "EUR", "€": "EUR",
+    "gbp": "GBP", "sterlin": "GBP", "£": "GBP",
+}
+
+# Sıra KRİTİK: binlik-gruplu -> EN ondalık -> TR ondalık -> düz.
+# EN ondalık, "3.5 milyar"daki "3.5"i yakalayabilmek için düz sayıdan ÖNCE gelir;
+# aksi hâlde motor "3"ü eşleyip ".5 milyar"ı atlar ve tutarı 5 milyar okur.
+_NUM = r"(?:\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+\.\d{1,2}|\d+(?:,\d+)?)"
+_MAG = r"(?:bin|milyon|milyar|trilyon)"
+_CUR = r"(?:TL|TRY|₺|USD|EUR|GBP|₤|£|\$|dolar|euro|sterlin|türk\s+lirası|abd\s+doları)"
+
+# (?<![\d.,]) -> bir sayının ORTASINDAN eşleşmeye başlamayı engeller
+# curpre -> "₺1.500.000", "$ 5 milyon" gibi ÖN EK para birimleri
+MONEY_RE = re.compile(
+    rf"(?<![\d.,])(?P<curpre>{_CUR})?\s*(?P<num>{_NUM})\s*(?P<mag>{_MAG})?\s*(?P<cur>{_CUR})?\b",
+    re.IGNORECASE,
+)
+
+# "1.234.567,89 TL" gibi binlik gruplu sayı
+_GROUPED = re.compile(r"\d{1,3}(?:\.\d{3})+(?:,\d+)?")
+# "1234,56" -> virgül ondalık (TR)
+_TR_DECIMAL = re.compile(r"\d+,\d+")
+# "3.5" -> nokta ondalık (EN sızması); binlik grubu DEĞİL
+_EN_DECIMAL = re.compile(r"\d+\.\d{1,2}")
+_PLAIN = re.compile(r"\d+")
+
+YEAR_MIN, YEAR_MAX = 1900, 2100
+
+
+@dataclass(frozen=True, slots=True)
+class Money:
+    amount: Decimal          # ham birimde (magnitude uygulanmış), ör. 500_000_000
+    currency: str            # 'TRY' | 'USD' | 'EUR' | 'GBP' | 'UNKNOWN'
+    raw: str                 # eşleşen ham metin (audit için)
+    start: int
+    end: int
+    warnings: tuple[str, ...] = ()
+
+    def to_try(self, fx: dict[str, Decimal] | None = None) -> Decimal | None:
+        fx = fx or {}
+        if self.currency == "TRY":
+            return self.amount
+        rate = fx.get(self.currency)
+        if rate is None:
+            return None
+        return (self.amount * rate).quantize(Decimal("0.01"))
+
+
+# --- Sayı normalizasyonu ----------------------------------------------------
+
+def _parse_number(tok: str) -> tuple[Decimal, tuple[str, ...]]:
+    """TR (1.234.567,89) ve EN (3.5) formatlarını ayırt ederek Decimal üret."""
+    warns: list[str] = []
+    if _GROUPED.fullmatch(tok):
+        # 1.234.567 veya 1.234.567,89
+        return Decimal(tok.replace(".", "").replace(",", ".")), ()
+    if _TR_DECIMAL.fullmatch(tok):
+        return Decimal(tok.replace(",", ".")), ()
+    if _EN_DECIMAL.fullmatch(tok):
+        # Nokta ondalık: TR metninde 3.5 yerine 3,5 beklenir -> uyarı üret
+        warns.append(f"en_format_decimal:{tok}")
+        return Decimal(tok), tuple(warns)
+    if _PLAIN.fullmatch(tok):
+        return Decimal(tok), ()
+    # Aşırı uzun / bozuk sayı: binlik ayırıcısı yanlış kullanılmış olabilir
+    try:
+        return Decimal(re.sub(r"[^\d]", "", tok)), (f"bozuk_sayi:{tok}",)
+    except InvalidOperation:  # pragma: no cover
+        raise ValueError(f"sayı çözümlenemedi: {tok!r}")
+
+
+# --- Ana fonksiyon ---------------------------------------------------------
+
+def find_amounts(text: str) -> list[Money]:
+    """Metindeki tüm parasal tutarları döndürür (metin sırasıyla)."""
+    if not text:
+        return []
+
+    # Yüzde ifadelerini maskele: "%12,5", "% 3", "yüzde 12"
+    masked = re.sub(r"%\s*\d+(?:[.,]\d+)?", " " * 0, text)
+    masked = re.sub(r"yüzde\s+\d+(?:[.,]\d+)?", "", masked, flags=re.IGNORECASE)
+
+    out: list[Money] = []
+
+    for m in MONEY_RE.finditer(masked):
+        num_tok = m.group("num")
+        mag_tok = (m.group("mag") or "").lower()
+        # ön ek ya da son ek para birimi (₺1.500.000 | 1.500.000 TL)
+        cur_tok = ((m.group("cur") or m.group("curpre")) or "").lower()
+
+        # Kural 1: ne büyüklük ne para birimi varsa -> tutar değil
+        if not mag_tok and not cur_tok:
+            continue
+
+        try:
+            value, warns = _parse_number(num_tok)
+        except (ValueError, InvalidOperation):
+            continue
+
+        # Kural 2: yıl sanısı (ör. "2024 milyon TL" gibi absürtlük yerine
+        # sadece tek başına 4 haneli yılları ele; büyüklük varsa dokunma)
+        if (
+            not mag_tok
+            and YEAR_MIN <= value <= YEAR_MAX
+            and value == int(value)
+            and "," not in num_tok
+            and "." not in num_tok
+        ):
+            continue
+
+        # Kural 3: büyüklük kelimesi uygula
+        if mag_tok:
+            value = value * MAGNITUDE[mag_tok]
+
+        currency = CURRENCY.get(cur_tok, "UNKNOWN")
+
+        # Kural 4: para birimi yok ama büyüklük var -> "15 milyar" (TL varsayımı
+        # yapma, işaretle; FX kararı çağıran katmanın)
+        warns_list = list(warns)
+        if currency == "UNKNOWN":
+            warns_list.append("para_birimi_yok")
+
+        out.append(
+            Money(
+                amount=value,
+                currency=currency,
+                raw=m.group(0).strip(),
+                start=m.start(),
+                end=m.end(),
+                warnings=tuple(warns_list),
+            )
+        )
+
+    return out
+
+
+def best_amount(text: str, fx: dict[str, Decimal] | None = None) -> Money | None:
+    """TRY değeri en büyük tutarı seç (KAP metinlerinde ana tutar genelde en büyüktür)."""
+    candidates = find_amounts(text)
+    if not candidates:
+        return None
+
+    def key(m: Money) -> tuple[int, Decimal]:
+        try_try = m.to_try(fx)
+        # TRY'ye çevrilebilenler önce gelir
+        return (1 if try_try is not None else 0, try_try or m.amount)
+
+    return max(candidates, key=key)
+
+
+# --- Öz testler ------------------------------------------------------------
+
+CASES: list[tuple[str, str | None, str | None]] = [
+    # (metin, beklenen tutar (TRY bazında string) | None, not)
+    ("Şirketimiz 15.000.000.000 TL tutarında yeni sözleşme imzalamıştır.", "15000000000", "binlik gruplu TRY"),
+    ("1,2 milyar TL tutarında yatırım kararı alınmıştır.", "1200000000", "virgül ondalık + milyar"),
+    ("500 milyon dolar tutarında kredi sağlanmıştır.", "500000000", "USD, FX gerekir"),
+    ("1.234,56 TL ceza kesilmiştir.", "1234.56", "TR ondalık"),
+    ("%12,5 oranında artış beklenmektedir.", None, "yüzde -> tutar değil"),
+    ("2024 yılında faaliyetlerine devam etmiştir.", None, "yıl -> tutar değil"),
+    ("Yönetim Kurulu 12 üyeden oluşmaktadır.", None, "aded -> tutar değil"),
+    ("3.5 milyar TL'lik ihale kazanıldı.", "3500000000", "EN formatı sızması, uyarı"),
+    ("Şirket 250 bin TL sermaye artırımı yapacaktır.", "250000", "bin"),
+    ("₺1.500.000 bedelli sermaye artırımı yapılacaktır.", "1500000", "önek sembol"),
+    ("1.234 adet pay satılmıştır.", None, "adet -> tutar değil"),
+    ("17.11.2026 tarihli açıklama.", None, "tarih -> tutar değil"),
+    ("Haber metninde hiç tutar yok.", None, "boş durum"),
+]
+
+FX_TEST = {"USD": Decimal("34.50")}
+
+
+def _selftest() -> int:
+    failed = 0
+    print(f"{'DURUM':6} {'METİN':52} {'BULUNAN':28} NOT")
+    print("-" * 120)
+    for text, expected, note in CASES:
+        m = best_amount(text, FX_TEST)
+        got = m.amount if m is not None else None
+        shown = "-" if m is None else f"{m.amount} {m.currency}"
+        if m is not None and m.currency != "TRY":
+            tr = m.to_try(FX_TEST)
+            shown += f" (~{tr} TRY)"
+
+        exp = None if expected is None else Decimal(expected)
+        ok = (got is None and exp is None) or (
+            got is not None and exp is not None and got == exp
+        )
+        if not ok:
+            failed += 1
+        print(f"{'OK' if ok else 'FAIL':6} {text[:50]:52} {shown[:40]:42} {note}")
+        if not ok:
+            print(f"       beklenen={exp} bulunan={got}")
+        if m is not None and m.warnings:
+            print(f"       uyarilar={list(m.warnings)}")
+
+    # Ekstra kontrol: uyarı üretimi
+    m = best_amount("3.5 milyar TL'lik ihale", FX_TEST)
+    assert m and "en_format_decimal:3.5" in m.warnings, m
+
+    print("-" * 120)
+    print(f"{len(CASES) - failed}/{len(CASES)} geçti")
+    return 0 if failed == 0 else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(_selftest())
