@@ -6,7 +6,8 @@ LLM ile skorlayan ve bildirim kanallarına dağıtan arka plan sistemi.
 ## Dokümanlar
 
 - **[docs/MIMARI.md](docs/MIMARI.md)** — yazılım mimarisi, veri modeli, hata kataloğu, faz planı
-- **[docs/VERI-KAYNAKLARI.md](docs/VERI-KAYNAKLARI.md)** — hangi veri nereden, hangi API ile (doğrulanmış)
+- **[docs/VERI-KATMANI-BORSAPY.md](docs/VERI-KATMANI-BORSAPY.md)** — aktif veri katmanı: borsapy + 4 sessiz tuzak
+- **[docs/VERI-KAYNAKLARI.md](docs/VERI-KAYNAKLARI.md)** — kaynak referansı: resmî API'ler, lisanslar
 - **[prototype/money_parser.py](prototype/money_parser.py)** — Türkçe tutar ayrıştırıcı prototipi
 
 ```bash

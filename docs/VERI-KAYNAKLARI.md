@@ -1,5 +1,11 @@
 # VERİ KAYNAKLARI — ne nereden, hangi API ile
 
+> **GÜNCEL KARAR (bu dosyadan sonra verildi):** proje **kişisel/eğitim** amaçlı
+> olduğu için resmî/lisanslı katman gerekmiyor; veri erişimi `borsapy` üzerinden
+> yapılacak. Bu dosya **referans** olarak kalıyor: (a) borsapy'nin arkasındaki
+> gerçek kaynaklar bunlar, (b) gün gelir ürünleşirse hangi resmî yola geçileceği
+> burada yazılı. Aktif kararlar: **[VERI-KATMANI-BORSAPY.md](VERI-KATMANI-BORSAPY.md)**.
+>
 > Soru: "Hazır API var mı?"
 > Kısa cevap: **Evet — 2025'ten beri MKK'nın resmî API Portalı var.** Ama tek
 > API her şeyi vermiyor; katman katman kurulacak. Bu dosyadaki her satır

@@ -11,11 +11,14 @@
 | # | Karar | Seçim | Durum |
 |---|---|---|---|
 | D1 | Dil/stack | Python 3.12, asyncio, httpx, pydantic v2 | ✅ kesin |
+| D12 | Veri kütüphanesi | `borsapy==0.11.0` pinli, tek dosyada izole | ✅ kesin |
+| D13 | borsapy ↔ asyncio | `asyncio.to_thread` + `Semaphore(4)` | ✅ kesin |
+| D14 | `Ticker` ömrü | uzun ömürlü tutulmaz (`cached_property` bayatlar) | ✅ kesin |
 | D2 | Kuyruk | Postgres `FOR UPDATE SKIP LOCKED` | ✅ kesin |
 | D3 | Dedup | DB unique constraint (bellek değil) | ✅ kesin |
 | D4 | Skor şeması | 3 eksen: `impact / sentiment / confidence` | ✅ kesin (§3) |
-| D5 | Bilanço kaynağı | MKK KAP ürünü (varsa) → İş Yatırım `MaliTablo` + KAP çapraz kontrol | ⏳ erişim deneyi (VERI-KAYNAKLARI §6) |
-| D6 | Bildirim akışı kaynağı | **MKK API Portal** birincil, KAP iç API yedek → [VERI-KAYNAKLARI.md](VERI-KAYNAKLARI.md) | ✅ kesin |
+| D5 | Bilanço kaynağı | **borsapy** (İş Yatırım `MaliTablo`) + bizim TTM doğrulaması | ✅ kesin (VERI-KATMANI-BORSAPY) |
+| D6 | Bildirim akışı kaynağı | **Kendi `kap_firehose`** (borsapy'de piyasa geneli feed yok) → [VERI-KATMANI-BORSAPY.md](VERI-KATMANI-BORSAPY.md) §3 | ✅ kesin |
 | D7 | Ciro bazı | TTM + aynı enflasyon düzeltme "vintage"ı | ✅ kesin (§2.3) |
 | D8 | Bildirim politikası | 3 kademe (anında / günlük özet / sadece DB) | ✅ kesin (§3.4) |
 | D9 | LLM sağlayıcı | Arayüz sabit, sağlayıcı değişken; seçim golden set ile | ⏳ eval bekliyor (§6) |
