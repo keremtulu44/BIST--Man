@@ -2,6 +2,9 @@
 
 > Kapsam: kod mimarisi, veri akışı, hata yönetimi. Ürün/pazarlama yok.
 > Bu doküman "ne yapacağız" değil **"kod arkada nasıl duracak"** sorusunun cevabı.
+>
+> Derinlemesine kararlar (veri kaynağı seçimi, skor modeli, state machine,
+> replay, gözlemlenebilirlik): **[TASARIM-DETAY.md](TASARIM-DETAY.md)**
 
 ---
 
@@ -343,14 +346,17 @@ yeniden değerlendirilebilir.
 
 ```python
 class Verdict(BaseModel):
-    score: float = Field(ge=0, le=10)
+    impact: float = Field(ge=0, le=10)     # BÜYÜKLÜK (ne kadar önemli)
     sentiment: Literal["POSITIVE", "NEUTRAL", "NEGATIVE"]
+    confidence: float = Field(ge=0, le=1)  # EMNİYET (ne kadar güveniyoruz)
     horizon: Literal["kisa", "orta", "uzun"]
-    materiality: Literal["low", "medium", "high"]
     summary: str = Field(max_length=500)
     rationale: list[str] = Field(min_length=1, max_length=5)
-    confidence: float = Field(ge=0, le=1)
 ```
+
+> Tek `score: 0-10` alanı iki farklı şeyi (büyüklük + emniyet) aynı sayıya
+> sıkıştırır: 8/10 "devasa ama şüpheli" ile 8/10 "orta ama kesin" ayrılamaz.
+> Üç eksenin gerekçesi ve birleştirme formülü: **TASARIM-DETAY.md §3**.
 
 `response_format={"type": "json_schema", "json_schema": {...}}` (veya
 SDK'nın `parse()` yardımcısı) + `temperature=0` + `max_tokens` sınırı.
@@ -395,6 +401,7 @@ yap, sezgiple değil (aşağıdaki replay).
 create table notification (
   id           bigserial primary key,
   disclosure_id text not null references disclosure(id),
+  ticker       text not null,                 -- bir bildirim N hisseyi etkileyebilir
   channel      text not null,                 -- 'telegram' | 'discord' | 'whatsapp'
   target       text not null,                 -- chat_id
   payload      jsonb not null,
@@ -403,7 +410,7 @@ create table notification (
   next_attempt_at timestamptz not null default now(),
   last_error   text,
   sent_at      timestamptz,
-  unique (disclosure_id, channel, target)     -- <- çift bildirimi DB engeller
+  unique (disclosure_id, ticker, channel, target)  -- <- çift bildirimi DB engeller
 );
 ```
 
