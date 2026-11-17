@@ -1,4 +1,6 @@
-# Durum Raporu — 2026-11-17
+# Durum Raporu
+
+> Gerçek veriyle ölçülen sayılar ve etkileri: **[GERCEK-VERI-RAPORU.md](GERCEK-VERI-RAPORU.md)** — 2026-11-17
 
 > Kapsam: konuşmadan bugüne ne çıktı. Ölçülebilir durum, **ampirik bulgular**
 > (kod değil bilgi), tasarım kararları, açık riskler.

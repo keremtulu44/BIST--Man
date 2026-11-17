@@ -22,6 +22,7 @@ kural tabanlı skorlayan ve bildirim kanallarına dağıtan hat.
 ## Dokümanlar
 
 - **[docs/DURUM-RAPORU.md](docs/DURUM-RAPORU.md)** ← **bugüne kadarki özet: bulgular, ölçümler, riskler**
+- **[docs/GERCEK-VERI-RAPORU.md](docs/GERCEK-VERI-RAPORU.md)** — **gerçek veriyle ne ölçüldü, ne düzeltildi** (tek sayfa)
 - **[docs/DOGRULAMA-ADIMLARI.md](docs/DOGRULAMA-ADIMLARI.md)** ← **senin yapacağın 2 doğrulama (PowerShell komutları)**
 - **[docs/PLAN-V1.md](docs/PLAN-V1.md)** — v1 planı: evren, kalibrasyon yöntemi, fazlar
 - **[docs/MIMARI.md](docs/MIMARI.md)** — yazılım mimarisi, veri modeli, hata kataloğu
@@ -66,6 +67,7 @@ src/bistman/
 ## Demolar
 
 ```bash
+.venv/bin/python scripts/gercek_veri_ozeti.py     # gerçek sayılarla: ne düzeltildi, karar nasıl değişti
 .venv/bin/python scripts/hat_demusu.py            # GERÇEK KAP akışı -> skor -> bildirim (ağsız)
 .venv/bin/python scripts/kalibrasyon_tablosu.py   # eşik/bütçe tablosu (sentetik)
 ```
