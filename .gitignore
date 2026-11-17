@@ -4,3 +4,7 @@ __pycache__/
 .pytest_cache/
 *.egg-info/
 .env
+
+# doğrulama çıktıları (yerel, commit edilmez)
+docs/dogrulama-sonuc.json
+docs/dogrulama-cikti.txt
