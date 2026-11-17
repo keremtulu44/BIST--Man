@@ -31,3 +31,31 @@ def test_name_norm_ascii_fold_makes_variants_equal() -> None:
 def test_name_norm_is_idempotent() -> None:
     once = name_norm("TÜRKİYE ŞİŞE VE CAM FABRİKALARI A.Ş.")
     assert name_norm(once) == once
+
+
+# ------------------------------------------------- başlıktaki sembol listesi
+
+
+def test_symbols_in_title_single() -> None:
+    from bistman.parsing.text import symbols_in_title
+
+    assert symbols_in_title("BISTECH Devre Kesici Bildirimi / MTRKS") == ("MTRKS",)
+
+
+def test_symbols_in_title_multi_and_digits() -> None:
+    from bistman.parsing.text import symbols_in_title
+
+    assert symbols_in_title("SPK İşlem Yasağı / A1CAP, AKSA, MTRKS") == ("A1CAP", "AKSA", "MTRKS")
+
+
+def test_symbols_in_title_ignores_legal_suffix() -> None:
+    """'A.Ş.' sembol sanılmamalı: `/` yoksa liste boş."""
+    from bistman.parsing.text import symbols_in_title
+
+    assert symbols_in_title("MATRİKS FİNANSAL TEKNOLOJİLER A.Ş.") == ()
+
+
+def test_symbols_in_title_none() -> None:
+    from bistman.parsing.text import symbols_in_title
+
+    assert symbols_in_title(None) == ()

@@ -32,7 +32,6 @@ Fon akışı istisnası: başlığında 3+ sembol sıralayan fon/portföy bildir
 from __future__ import annotations
 
 import asyncio
-import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable, Mapping, Sequence
@@ -41,7 +40,7 @@ from .analysis.calibration import ScoredEvent
 from .analysis.event_study import Series, compute_event
 from .parsing.kap_table import HistoryRow
 from .pipeline import ProcessedDisclosure, process_batch
-from .parsing.text import tr_lower
+from .parsing.text import symbols_in_title, tr_lower
 from .scoring import ScoringConfig
 from .sources.base import DisclosureStub, FundamentalRow
 from .ticker_map import TickerResolver
@@ -61,23 +60,6 @@ __all__ = [
     "scored_from_results",
     "stub_from_row",
 ]
-
-
-_SYMBOL = re.compile(r"\b[A-Z][A-Z0-9]{2,4}\b")
-"""BIST sembolü: 3-5 karakter, harfle başlar, rakam içerebilir (A1CAP, A1YEN)."""
-_TITLE_SYMBOL_SPLIT = re.compile(r"\s/\s")
-
-
-def symbols_in_title(title: str | None) -> tuple[str, ...]:
-    r"""Başlıktaki `/` sonrası sembol listesi: '... / IDH, IEV, MTRKS, TTE'.
-
-    Yalnız `/` varsa ayrıştırılır: şirket unvanlarındaki büyük harfli kısaltmalar
-    (A.Ş., T.A.Ş.) sembol sanılmasın. Boşluk şartı (`\s/\s`) bunu sağlar.
-    """
-    if not title or not _TITLE_SYMBOL_SPLIT.search(title):
-        return ()
-    tail = _TITLE_SYMBOL_SPLIT.split(title)[-1]
-    return tuple(_SYMBOL.findall(tail))
 
 
 def row_symbols(row: HistoryRow) -> set[str]:

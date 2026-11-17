@@ -14,6 +14,7 @@ from typing import Awaitable, Callable, Literal, Mapping, Protocol, Sequence
 from .features import Features, amount_try_from_text, build_features
 from .scoring import Decision, ScoringConfig, score
 from .sources.base import DisclosureStub, FundamentalRow
+from .parsing.text import symbols_in_title
 from .ticker_map import TickerResolver
 from .triage import Route, looks_like_fund, route
 
@@ -162,11 +163,23 @@ async def process_batch(
 
 
 def _resolve_ticker(disclosure: DisclosureStub, resolver: TickerResolver) -> str | None:
-    """Yapısal ticker varsa onu kullan (detay ucu), yoksa unvandan çöz."""
-    if disclosure.tickers:
+    """Yapısal ticker varsa onu kullan (detay ucu), yoksa unvandan çöz.
+
+    Canlı akış (`/api/disclosure/list/light`) ticker vermiyor; platform
+    bildirimlerinin başlığı ise şirket unvanı değil "BORSA İSTANBUL ... / MTRKS"
+    biçiminde. Gerçek 89 satırlık geçmişte bu satırların **%33'ü** yalnız
+    unvanla çözülemiyordu; başlıktaki tek sembol o boşluğun çoğunu kapatıyor.
+    Çok sembollü başlık (piyasa geneli duyuru) hâlâ belirsiz: tahmin yok.
+    """
+    if disclosure.tickers and disclosure.tickers[0]:
         return disclosure.tickers[0]
     resolution = resolver.resolve(disclosure.title)
-    return resolution.ticker
+    if resolution.ticker:
+        return resolution.ticker
+    symbols = symbols_in_title(disclosure.title)
+    if len(symbols) == 1:
+        return symbols[0]
+    return None
 
 
 def _dec(value: float | None) -> Decimal | None:

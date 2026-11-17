@@ -296,3 +296,67 @@ def test_body_provider_not_called_when_summary_has_amount() -> None:
         )
     )
     assert called == []  # gereksiz istek yok
+
+
+# ------------------------------------------- canlı akışta unvan yok: başlık sembolü
+
+
+def _stub(index: int, title: str, subject: str, summary: str | None = None) -> DisclosureStub:
+    return DisclosureStub(
+        index=index,
+        published_at=datetime(2026, 10, 5, 9, 0, tzinfo=UTC),
+        title=title,
+        subject=subject,
+        summary=summary,
+        disclosure_class="dkb",
+        tickers=(),
+    )
+
+
+def test_platform_title_with_single_symbol_resolves() -> None:
+    """Canlı akışta ticker alanı yok; tek sembollü platform başlığı çözülmeli.
+
+    Not: gerçek fixture'da bu yola düşen satırlar çoğunlukla ÇOK sembollü
+    (fon akışı, piyasa geneli). Tek sembol, KAP duyurusu tek hisseyi
+    ilgilendirdiğinde devreye girer; o zaman unvan eşleşmesi boş döner.
+    """
+    resolver = TickerResolver.from_pairs([("MTRKS", "MATRİKS FİNANSAL TEKNOLOJİLER A.Ş.")])
+    results = asyncio.run(
+        process_batch(
+            [
+                _stub(
+                    9,
+                    "KAMUYU AYDINLATMA PLATFORMU Kamuyu Aydınlatma Platformu "
+                    "Duyurusu / MTRKS",
+                    "Kamuyu Aydınlatma Platformu Duyurusu",
+                )
+            ],
+            resolver=resolver,
+            fundamentals={},
+            cfg=CFG,
+        )
+    )
+    assert results[0].ticker == "MTRKS"
+    assert results[0].status == "no_fundamentals"  # finansal veri yok ama atıf doğru
+
+
+def test_multi_symbol_title_stays_unresolved() -> None:
+    """Piyasa geneli duyuru (13 satır): tek hisseye yazmak tahmin olur."""
+    resolver = TickerResolver.from_pairs([("MTRKS", "MATRİKS FİNANSAL TEKNOLOJİLER A.Ş.")])
+    results = asyncio.run(
+        process_batch(
+            [
+                _stub(
+                    10,
+                    "KAMUYU AYDINLATMA PLATFORMU Kamuyu Aydınlatma Platformu "
+                    "Duyurusu / AHSGY, BLA, MTRKS",
+                    "Kamuyu Aydınlatma Platformu Duyurusu",
+                )
+            ],
+            resolver=resolver,
+            fundamentals={},
+            cfg=CFG,
+        )
+    )
+    assert results[0].ticker is None
+    assert results[0].status == "unresolved_ticker"

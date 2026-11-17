@@ -47,6 +47,27 @@ _ASCII_FOLD = str.maketrans(
 )
 _SPACES = re.compile(r"\s+")
 
+# BIST sembolü: 3-5 karakter, harfle başlar, rakam içerebilir (A1CAP, A1YEN).
+SYMBOL_RE = re.compile(r"\b[A-Z][A-Z0-9]{2,4}\b")
+# KAP çok hisseli bildirimlerde semboller başlığın " / " sonrasında sıralanır:
+#   "BORSA İSTANBUL BISTECH ... Bildirimi / MTRKS"
+#   "BORSA İSTANBUL A.Ş. Hak Kullanımı / KRGYO, MTRKS"
+_TITLE_SYMBOL_SPLIT = re.compile(r"\s/\s")
+
+
+def symbols_in_title(title: str | None) -> tuple[str, ...]:
+    r"""Başlıktaki `/` sonrası sembol listesini döndürür.
+
+    Yalnız `\s/\s` varsa ayrıştırılır: şirket unvanlarındaki "A.Ş." gibi
+    kısaltmalar sembol sanılmasın. KAP bu biçimi platform bildirimlerinde
+    (devre kesici, tipe dönüşüm, işlem yasağı) kullanıyor; canlı akışta
+    ticker alanı olmadığı için tek yol bu.
+    """
+    if not title or not _TITLE_SYMBOL_SPLIT.search(title):
+        return ()
+    tail = _TITLE_SYMBOL_SPLIT.split(title)[-1]
+    return tuple(SYMBOL_RE.findall(tail))
+
 
 def tr_lower(text: str) -> str:
     """Türkçe kurallarına uygun küçük harfe çevirir."""
