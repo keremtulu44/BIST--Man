@@ -21,6 +21,7 @@ kural tabanlı skorlayan ve bildirim kanallarına dağıtan hat.
 
 ## Dokümanlar
 
+- **[docs/DURUM-RAPORU.md](docs/DURUM-RAPORU.md)** ← **bugüne kadarki özet: bulgular, ölçümler, riskler**
 - **[docs/PLAN-V1.md](docs/PLAN-V1.md)** — v1 planı: evren, kalibrasyon yöntemi, fazlar
 - **[docs/MIMARI.md](docs/MIMARI.md)** — yazılım mimarisi, veri modeli, hata kataloğu
 - **[docs/TASARIM-DETAY.md](docs/TASARIM-DETAY.md)** — skor modeli, state machine, replay, karar kaydı
