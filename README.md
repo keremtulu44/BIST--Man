@@ -17,7 +17,7 @@ kural tabanlı skorlayan ve bildirim kanallarına dağıtan hat.
 | 3b | Kural skor (`config/scoring.toml`) + uçtan uca hat + Telegram istemcisi | ✅ |
 | 4 | Gerçek veriyle kalibrasyon (KAP geçmişi ✅ ayrıştırılıyor + fiyat) | ⏳ sırada |
 
-`pytest`: **243 test**, ağ erişimi gerektirmez.
+`pytest`: **248 test**, ağ erişimi gerektirmez.
 
 ## Dokümanlar
 

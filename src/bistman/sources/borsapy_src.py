@@ -47,13 +47,14 @@ ROLE_KEYWORDS: dict[str, tuple[str, ...]] = {
         "toplam gelir",
     ),
     "net_income": (
+        "donem kari zarari",
         "net donem kar",
+        "donem net kar",
         "net donem zarar",
-        "donem kari",
-        "donem kar zarari",
-        "net kar",
+        "ana ortaklik paylari",
         "ana ortaklik payi",
-        "surdurulen faaliyetler",
+        "donem kari",
+        "net kar",
     ),
     "equity": ("ozkaynak", "ana ortakliga ait ozkaynak"),
     "total_assets": ("toplam aktif", "aktif toplam", "toplam varlik"),
@@ -76,7 +77,23 @@ _FOLD_MAP = str.maketrans(
 _RE_TOP_LEVEL = re.compile(r"^(?P<num>[IVX]{1,5})\.\s*(?P<rest>.+)$")
 _RE_SUB_LEVEL = re.compile(r"^(?P<num>\d+(?:\.\d+)+)\s*(?P<rest>.+)$")
 
-_NEGATIVE_HINTS = ("diger", "other", "alt kalem", "ertelenmis", "matrah", "onceki donem")
+# Sert elemeler: bu kelimeleri içeren kalem, o rol için ASLA seçilmez.
+# Gerçek fixture'da (THYAO, 133 kalem) `Dönem Karı Vergi Yükümlülüğü` net kâr
+# sanılmıştı; 0.5 milyar TL'lik vergi kalemi, ~90 milyar TL'lik kârın yerine geçti.
+_HARD_NEGATIVE = (
+    "vergi",
+    "yukumlul",
+    "ertelenmis",
+    "matrah",
+    "gecmis yil",
+    "durdurulan",
+    "dagilim",
+    "karsilig",
+    "karsilik",
+)
+
+# Yumuşak cezalar: elenmez ama üst kalemin gerisinde kalır.
+_SOFT_NEGATIVE = ("diger", "other", "alt kalem", "onceki donem")
 
 
 def fold(text: str) -> str:
@@ -118,7 +135,9 @@ def _score(label: str, role: str) -> tuple[int, bool]:
     if sub:
         score -= 3  # "1.7 Diğer Faiz Gelirleri" gibi alt kalem
 
-    for hint in _NEGATIVE_HINTS:
+    if any(hint in folded for hint in _HARD_NEGATIVE):
+        return 0, False  # sert eleme
+    for hint in _SOFT_NEGATIVE:
         if hint in folded:
             score -= 2
 

@@ -23,7 +23,7 @@ oturuyor.
 | Commit | 10 |
 | Takip edilen dosya | 38 |
 | Python satırı (src + tests) | 2.474 |
-| Test | **243**, tamamı geçiyor, ağ erişimi yok |
+| Test | **248**, tamamı geçiyor, ağ erişimi yok |
 | Süre | ~0.24 s |
 | Gerçek KAP yanıtı fixture | 2 (`list_light_sample.json`, `detail_1699030.json`) |
 | Dış bağımlılık (runtime) | yok (yalnız `httpx`; `borsapy` Faz 1'de) |
@@ -32,7 +32,7 @@ Test dağılımı:
 
 ```
 test_money 21 · test_triage 29 · test_kap_table 29 · test_ttm 15 · test_features 18
-test_kap_source 20 · test_scoring 16 · test_borsapy_src 24 · test_event_study 15
+test_kap_source 20 · test_scoring 16 · test_borsapy_src 29 · test_event_study 15
 test_pipeline_e2e 14 · test_ticker_map 9 · test_dates 8 · test_calibration 8
 test_notify 7 · test_config 4 · test_text 4
 ```
@@ -62,6 +62,10 @@ okumasıyla teyit edildi; projenin geri kalanını bunlar şekillendirdi.
 | **B14** | **Satır seçimi tuzağı:** `faiz gelirleri` araması AKBNK'ta `1.7 Diğer Faiz Gelirleri` (alt kalem, 4.3 mlr) seçti; doğrusu `I. FAİZ GELİRLERİ`. Payda ~40x yanlış | Aynı rapor | `sources/borsapy_src.select_row`: Roma rakamlı üst kalem +, `diğer/alt` −, alt-numaralı (1.7) − |
 | **B15** | **`fast_info` BOŞ döndü** (`{}`) — hem THYAO hem AKBNK. PD/F/K yok | Aynı rapor | `ratio_mcap` sessizce `None` olacaktı; `no_market_cap` bayrağı var, `dogrulama2` fiyatın nerede olduğunu arıyor |
 | **B16** | borsapy TTM'i **kendi içinde tutarlı** (TTM == 4 sütun toplamı, fark %0.0000) ama **yanlış** | Aynı rapor | "Tutarlılık testi geçti" ≠ "sayı doğru". Doğrulama kriteri: yıllık tabloyla karşılaştırma |
+| **B17** | **Kümülatif hipotez KESİNLEŞTİ (gerçek veri):** THYAO TTM 1,364,849,196,737 (borsapy 2.72 trilyon = **1.99x**); AKBNK faiz geliri 679,718,603,000 (**2.36x**) | `dogrulama-sonuc3.json`, 8 çeyrek + 4 yıllık tablo | `analysis/ttm.py` üretimde kullanılabilir; payda sorunu kapandı |
+| **B18** | `MaliTablo` **üç tabloyu birden** döndürüyor (bilanço 1xxx/2xxx, gelir 3xxx, nakit akışı 4xxx): THYAO 133, AKBNK 192 kalem | Aynı rapor | `itemCode` ile filtre şart; yoksa nakit akışı kalemi gelir tablosu sanılır |
+| **B19** | Bu karışıklık somut hataya dönüştü: net kâr olarak `Dönem Karı Vergi Yükümlülüğü` seçildi (0.5 milyar) | Aynı rapor | `_HARD_NEGATIVE` (vergi/yükümlülük/ertelenmiş/dağılım/geçmiş yıl) → kalem **diskalfiye**, ceza yetmiyor |
+| **B20** | THYAO sanayi şablonunda kâr satırı `DÖNEM KARI (ZARARI)`; `Dönem Net Kar/Zararı` nakit akışı kalemi | Kalem dökümü (133 satır) | Eşleme tablosu artık gerçek adlarla sabit |
 
 **B13 projenin en pahalı hatasını önledi:** doğrulama olmasaydı sistem "her haber
 küçük" diye susacak, kimse nedenini anlamayacaktı — çünkü kod çalışıyor, testler

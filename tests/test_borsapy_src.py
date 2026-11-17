@@ -213,3 +213,52 @@ def test_fundamentals_bank_template_keeps_statement_type() -> None:
     assert row.statement_type == "bank"
     assert row.revenue_ttm == pytest.approx(1.83876 + 1.004 - 0.78)
     assert row.revenue_ttm > 1.0  # alt kalem seçilseydi 0.09 civarı çıkardı
+
+
+# ------------------------------- GERÇEK kalem listesi (THYAO, 133 kalem, 17.11.2026)
+
+# `MaliTablo` üç tabloyu birden döndürüyor (bilanço + gelir + nakit akış).
+# Aşağıdakiler nakit akışı ve bilanço kalemleriyle karışmış gerçek listeden.
+THYAO_REAL_LABELS = [
+    "    Uzun vadeli karşılıklar",
+    "  Borç Karşılıkları",
+    "  Dönem Karı Vergi Yükümlülüğü",
+    "  Dönem Net Kar/Zararı",
+    "  Geçmiş Yıllar Kar/Zararları",
+    "  Kardan Ayrılan Kısıtlanmış Yedekler",
+    "DÖNEM KARI (ZARARI)",
+    "Dönem Kar/Zararının Dağılımı",
+    "SÜRDÜRÜLEN FAALİYETLER DÖNEM KARI/ZARARI",
+    "Durdurulan Faaliyetler Vergi Sonrası Dönem Karı (Zararı)",
+    "Net Faaliyet Kar/Zararı",
+    "BRÜT KAR (ZARAR)",
+    "Satış Gelirleri",
+    "TOPLAM VARLIKLAR",
+    "Özkaynaklar",
+]
+
+
+def test_real_labels_net_income_is_period_profit_not_tax_item() -> None:
+    """ASIL HATA: 'Dönem Karı Vergi Yükümlülüğü' (0.5 milyar) net kâr sanıldı."""
+    pick = select_row(THYAO_REAL_LABELS, "net_income")
+    assert pick.label == "DÖNEM KARI (ZARARI)"
+    assert "Vergi" not in pick.label
+
+
+def test_real_labels_revenue_lock() -> None:
+    assert select_row(THYAO_REAL_LABELS, "revenue").label == "Satış Gelirleri"
+
+
+def test_real_labels_total_assets() -> None:
+    assert select_row(THYAO_REAL_LABELS, "total_assets").label == "TOPLAM VARLIKLAR"
+
+
+def test_real_labels_equity() -> None:
+    assert select_row(THYAO_REAL_LABELS, "equity").label == "Özkaynaklar"
+
+
+def test_tax_item_never_wins_for_net_income_even_alone() -> None:
+    """Listede yalnızca tuzak kalem varsa: ya doğru alternatif ya None — asla vergi kalemi."""
+    lonely = ["  Dönem Karı Vergi Yükümlülüğü", "  Geçmiş Yıllar Kar/Zararları"]
+    pick = select_row(lonely, "net_income")
+    assert pick.label is None
