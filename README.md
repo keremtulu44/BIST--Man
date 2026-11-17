@@ -2,7 +2,7 @@
 
 KAP bildirimlerini izleyip BIST 50 şirketlerinin finansallarıyla birleştiren,
 kural tabanlı skorlayan ve bildirim kanallarına dağıtan hat.
-**Kişisel/eğitim amaçlı** (veri: borsapy, ticari kullanım lisansı yok).
+**Kişisel/eğitim amaçlı** (veri: İş Yatırım kamuya açık uçları; borsapy bağımlılığı kaldırıldı).
 
 ## Durum
 
@@ -11,13 +11,13 @@ kural tabanlı skorlayan ve bildirim kanallarına dağıtan hat.
 | 0 | Saf ayrıştırma, triyaj, config | ✅ |
 | 2a | KAP firehose istemcisi + ayrıştırıcılar (gerçek fixture, mock transport) | ✅ |
 | 2b | Unvan→kod eşleme + oran/ceza motoru | ✅ |
-| 1 | borsapy adaptörü + TTM elle doğrulama | ⏳ sırada (ağ gerekir) |
+| 1 | TTM/tablo doğrulaması + stdlib istemci | ✅ |
 | 2c | Postgres şeması + dedup + cursor | |
 | 3a | Event study motoru (CAR, z, t0 seçimi) + kalibrasyon ızgarası | ✅ |
 | 3b | Kural skor (`config/scoring.toml`) + uçtan uca hat + Telegram istemcisi | ✅ |
 | 4 | Gerçek veriyle kalibrasyon (KAP geçmişi ✅ ayrıştırılıyor + fiyat) | ⏳ sırada |
 
-`pytest`: **248 test**, ağ erişimi gerektirmez.
+`pytest`: **270 test**, ağ erişimi gerektirmez.
 
 ## Dokümanlar
 
@@ -50,8 +50,9 @@ src/bistman/
 ├── scoring.py       # impact = konu_prior + oran_bucket; confidence çarpımsal; gerekçe üretir
 ├── pipeline.py      # uçtan uca hat: triyaj -> hisse -> oran -> skor -> bildirim
 ├── notify.py        # Telegram (parse_mode YOK, 4000'e böler, 429'a uyar) + FakeNotifier
-├── analysis/ttm.py      # kümülatif/tekil tespiti + doğru TTM (borsapy 2x hatalı çıktı)
-├── sources/isyatirim_labels.py  # kalem seçici (Roma rakamlı üst kalem) + tablo birleştirme
+├── analysis/ttm.py      # kümülatif/tekil tespiti, akış vs stok, doğru TTM
+├── sources/isyatirim_labels.py  # kalem seçici: itemCode tablo ayrımı + Roma rakamı önceliği
+├── sources/isyatirim_client.py  # MaliTablo istemcisi: SADECE stdlib, borsapy/pandas YOK
 ├── analysis/
 │   ├── event_study.py   # t0 seçimi, CAR (endeks arındırılmış), z (oynaklık normalize)
 │   └── calibration.py   # eşik × günlük bütçe ızgarası -> isabet/kaçan tablosu

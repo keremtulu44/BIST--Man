@@ -272,6 +272,88 @@ def annual_values(columns: Sequence[object], values: Sequence[float]) -> dict[in
 # ------------------------------------------------------------------ birleştirme
 
 
+# --------------------------------------------------- JSON kalemleri (üretim yolu)
+
+
+def _item_points(item: dict, months: Sequence[int] | None = None) -> list[TTMPoint]:
+    """{"values": {(yıl, ay): değer}} -> TTMPoint listesi (ay // 3 = çeyrek)."""
+    points: list[TTMPoint] = []
+    for (year, month), value in (item.get("values") or {}).items():
+        if value is None:
+            continue
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            continue
+        points.append(TTMPoint(int(year), int(month) // 3, numeric))
+    return sorted(points, key=lambda p: (p.year, p.quarter))
+
+
+def fundamentals_from_items(
+    *,
+    ticker: str,
+    quarterly: Sequence[dict],
+    annual: Sequence[dict] | None = None,
+    statement_type: str = "industrial",
+    market_cap: float | None = None,
+    period_end: str = "",
+    source: str = "isyatirim/malitablo",
+) -> FundamentalRow:
+    """`MaliTablo` kalemlerinden `FundamentalRow` (pandas yok — üretim yolu).
+
+    Kalem biçimi: {"label": str, "code": str, "values": {(yıl, ay): değer}}.
+    Ay, çeyreğe çevrilir (3->Q1, 6->Q2, 9->Q3, 12->Q4) ve tablo ayrımı itemCode
+    ile yapılır.
+    """
+    labels = [str(i.get("label", "")) for i in quarterly]
+    codes = [str(i.get("code", "")) for i in quarterly]
+    by_label = {str(i.get("label", "")): i for i in quarterly}
+    annual_by_label = {str(i.get("label", "")): i for i in (annual or [])}
+    flags: list[str] = []
+    values: dict[str, float | None] = {}
+
+    for role in ("revenue", "net_income", "equity"):
+        pick = select_row(labels, role, codes)
+        if not pick.found:
+            flags.append(f"row_not_found:{role}")
+            values[role] = None
+            continue
+
+        points = _item_points(by_label[pick.label])  # type: ignore[index]
+        annual_map: dict[int, float] | None = None
+        if role == "revenue" and pick.label in annual_by_label:
+            annual_map = {
+                p.year: p.value
+                for p in _item_points(annual_by_label[pick.label])
+                if p.quarter == 4
+            }
+
+        result = compute_ttm(points, annual_map, kind=ROLE_KIND[role])  # type: ignore[arg-type]
+        values[role] = result.value
+        flags.extend(f for f in result.flags if f not in flags)
+
+        if role == "revenue" and result.value is not None and ROLE_KIND["revenue"] == "flow":
+            naive = naive_borsapy_ttm(points)
+            if naive is not None and abs(naive - result.value) / max(abs(result.value), 1.0) > 0.01:
+                flags.append("naive_sum_mismatch")
+
+    if values["revenue"] is None:
+        flags.append("no_revenue")
+    if market_cap is None:
+        flags.append("no_market_cap")
+
+    return FundamentalRow(
+        ticker=ticker,
+        period_end=period_end,
+        statement_type=statement_type,
+        revenue_ttm=values["revenue"],
+        net_income_ttm=values["net_income"],
+        equity=values["equity"],
+        flags=tuple(dict.fromkeys(flags)),
+        source=source,
+    )
+
+
 # ------------------------------------------------------------------ DataFrame
 
 

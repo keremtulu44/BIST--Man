@@ -23,7 +23,7 @@ oturuyor.
 | Commit | 10 |
 | Takip edilen dosya | 38 |
 | Python satırı (src + tests) | 2.474 |
-| Test | **255**, tamamı geçiyor, ağ erişimi yok |
+| Test | **270**, tamamı geçiyor, ağ erişimi yok |
 | Süre | ~0.24 s |
 | Gerçek KAP yanıtı fixture | 2 (`list_light_sample.json`, `detail_1699030.json`) |
 | Dış bağımlılık (runtime) | yok (yalnız `httpx`; `borsapy` Faz 1'de) |
@@ -31,10 +31,11 @@ oturuyor.
 Test dağılımı:
 
 ```
-test_money 21 · test_triage 29 · test_kap_table 29 · test_ttm 15 · test_features 18
-test_kap_source 20 · test_scoring 16 · test_isyatirim_labels 36 · test_event_study 15
-test_pipeline_e2e 14 · test_ticker_map 9 · test_dates 8 · test_calibration 8
-test_notify 7 · test_config 4 · test_text 4
+test_triage 30 · test_kap_table 29 · test_isyatirim_labels 36 · test_ttm 15
+test_money 21 · test_kap_source 20 · test_features 18 · test_scoring 16
+test_isyatirim_client 15 · test_event_study 15 · test_pipeline_e2e 14
+test_ticker_map 9 · test_dates 8 · test_calibration 8 · test_notify 7
+test_config 4 · test_text 4
 ```
 
 ---
@@ -70,6 +71,7 @@ okumasıyla teyit edildi; projenin geri kalanını bunlar şekillendirdi.
 | **B22** | `DÖNEM KARI (ZARARI)` **bilanço** kalemi (dağıtılmamış kâr, stok); gelir tablosundaki net kâr `SÜRDÜRÜLEN FAALİYETLER DÖNEM KARI/ZARARI` | Aynı rapor + kalem kodu 2N5 vs 3J | Tablo filtresi olmadan stok kalem akış sanılır; iki kavram karışır |
 | **B23** | **Özkaynak/aktif STOK kalem**: TTM'i olmaz. "TTM özkaynak" 1.40 trilyon çıktı, doğrusu son bilanço 1.02 trilyon | Aynı rapor | `compute_ttm(kind="stock")` → son değer; akış varsayımı %37 hata |
 | **B24** | **AKBNK 2025Q3 özkaynak/aktif = 0** (258.9 → 0 → 310.2). Sıfır değer değil, veri boşluğu | Aynı rapor | 0'lar eksik sayılır + `data_gap` bayrağı; `tutar/0` felaketi önlendi |
+| **B25** | `MaliTablo` istemcisi **40 satır standart kütüphane** ile yazıldı: borsapy/pandas/numpy/httpx gerekmiyor | `isyatirim_client.py` + sahte taşıyıcı testleri | Kurulum sorunu kökten bitti; üretim yolu tek bağımlılıksız |
 
 **B13 projenin en pahalı hatasını önledi:** doğrulama olmasaydı sistem "her haber
 küçük" diye susacak, kimse nedenini anlamayacaktı — çünkü kod çalışıyor, testler
@@ -169,7 +171,7 @@ Tam liste: `TASARIM-DETAY.md §1`.
 | Sıra | İş | Kim |
 |---|---|---|
 | 1 | Kural skor (`config/scoring.toml`) + uçtan uca dikey dilim testi | ajan (ağsız) |
-| 2 | `isyatirim_labels.py` adaptörü (to_thread + limiter) + TTM doğrulama | ajan yazar, **sen çalıştırırsın** |
+| 2 | ~~TTM doğrulama~~ **BİTTİ**: kümülatif tespiti + tablo ayrımı + stok/akış. İstemci `isyatirim_client.py` (stdlib) | ✅ 5 doğrulama turu |
 | 3 | `member_history` HTML parser (gerçek HTML fixture'ı ile) | ajan + sen (1 kayıt) |
 | 4 | Postgres şeması + dedup/cursor + reaper | ajan |
 | 5 | Gerçek veriyle kalibrasyon (1 yıl, 50 hisse) → eşik kararı | ajan + sen |
