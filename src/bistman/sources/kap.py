@@ -233,6 +233,11 @@ class KapClient:
 
         raise KapUnavailable(f"{self._max_attempts} deneme başarısız: {url}") from last_exc
 
+    async def get_text(self, path: str) -> str:
+        """Ham metin/HTML yanıtı — JSON olmayan uçlar için (şirket listesi vb.)."""
+        response = await self._get(path)
+        return response.text
+
     async def light(self) -> ParseResult:
         """Bugünün tüm bildirim akışı. Boş sonuç **şüpheli**dir (çağıran kontrol eder)."""
         response = await self._get(LIGHT_PATH)

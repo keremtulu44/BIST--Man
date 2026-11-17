@@ -15,7 +15,7 @@ kural tabanlı skorlayan ve bildirim kanallarına dağıtan hat.
 | 2c | Postgres şeması + dedup + cursor | |
 | 3a | Event study motoru (CAR, z, t0 seçimi) + kalibrasyon ızgarası | ✅ |
 | 3b | Kural skor (`config/scoring.toml`) + uçtan uca hat + Telegram istemcisi | ✅ |
-| 4 | Gerçek veriyle kalibrasyon (KAP geçmişi ✅ ayrıştırılıyor + fiyat) | ⏳ sırada |
+| 4 | Gerçek veriyle kalibrasyon (KAP geçmişi + fiyat + gövde tutarı) | 🔧 kod ✅, koşu sende |
 
 `pytest`: **270 test**, ağ erişimi gerektirmez.
 
@@ -70,9 +70,11 @@ src/bistman/
 .venv/bin/python scripts/gercek_veri_ozeti.py     # gerçek sayılarla: ne düzeltildi, karar nasıl değişti
 .venv/bin/python scripts/hat_demusu.py            # GERÇEK KAP akışı -> skor -> bildirim (ağsız)
 .venv/bin/python scripts/kalibrasyon_tablosu.py   # eşik/bütçe tablosu (sentetik)
+.venv/bin/python scripts/kalibrasyon_gercek.py --dry-run  # Faz 4 hattı, ağ olmadan
 ```
 
 Gerçek veriyle aynı kod çalışır (Faz 4): KAP geçmişi + fiyat serisi -> `ScoredEvent`
+([docs/FAZ4-KALIBRASYON.md](docs/FAZ4-KALIBRASYON.md): sende koşulacak tek komut)
 -> `sweep()`. Eşikler sezgiyle değil, "kaçan vs isabet" dengesinden seçilir.
 
 ## Tasarım kuralları (kısaca)

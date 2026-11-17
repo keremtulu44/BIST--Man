@@ -74,6 +74,8 @@ okumasıyla teyit edildi; projenin geri kalanını bunlar şekillendirdi.
 | **B23** | **Özkaynak/aktif STOK kalem**: TTM'i olmaz. "TTM özkaynak" 1.40 trilyon çıktı, doğrusu son bilanço 1.02 trilyon | Aynı rapor | `compute_ttm(kind="stock")` → son değer; akış varsayımı %37 hata |
 | **B24** | **AKBNK 2025Q3 özkaynak/aktif = 0** (258.9 → 0 → 310.2). Sıfır değer değil, veri boşluğu | Aynı rapor | 0'lar eksik sayılır + `data_gap` bayrağı; `tutar/0` felaketi önlendi |
 | **B25** | `MaliTablo` istemcisi **40 satır standart kütüphane** ile yazıldı: borsapy/pandas/numpy/httpx gerekmiyor | `isyatirim_client.py` + sahte taşıyıcı testleri | Kurulum sorunu kökten bitti; üretim yolu tek bağımlılıksız |
+| **B26** | Kalibrasyon hattı uçtan uca bağlandı, ama **gerçek veride skorlar sıfıra çöküyor** — çünkü geçmiş tablosunda **tutar yok** | `backfill.py` + `scripts/kalibrasyon_gercek.py` `--dry-run` | Eşiği ölçmek için gövde indirmek şart; 89 satırlık fixture'da medyan skor 0.00 |
+| **B27** | MTRKS sayfasındaki 'İŞ PORTFÖY … / IDH, IEV, …, MTRKS' satırının `Kod` sütunu **ISP** yazıyor: ihraççı fon, konu MTRKS. Eski atıf bu satırları MTRKS'ten siliyordu | `attribute_ticker` (üye kodu kazanır) + başlık sembol listesi | 3 satır MTRKS'e döndü; 3 fon-akışı satırı sayılarak dışlandı |
 
 **B13 projenin en pahalı hatasını önledi:** doğrulama olmasaydı sistem "her haber
 küçük" diye susacak, kimse nedenini anlamayacaktı — çünkü kod çalışıyor, testler

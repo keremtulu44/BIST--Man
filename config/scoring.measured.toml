@@ -1,0 +1,13 @@
+# ÖLÇÜLMÜŞ DEĞERLER — otomatik üretildi, elle düzenlenmez.
+# `config/scoring.toml`'a taşımadan önce docs/kalibrasyon-sonuc.md okunmalı.
+
+[measured]
+events = 20
+material_z2 = 2
+
+# Ölçüm yapılamadı: hiçbir varyantta push üretilmedi.
+# Önce örneklemi/tutar kaynağını düzelt, sonra eşik tartışılır.
+
+[measured.current]
+push_threshold = 6.5
+digest_threshold = 3.5
