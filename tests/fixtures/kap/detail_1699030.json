@@ -1,0 +1,27 @@
+[
+  {
+    "disclosure": {
+      "disclosureBasic": {
+        "title": "Haber ve Söylentilere İlişkin Açıklama",
+        "mkkMemberOid": "8acae2c575a1b5b60177de29c7177130",
+        "companyTitle": "MATRİKS FİNANSAL TEKNOLOJİLER A.Ş.",
+        "stockCode": "MTRKS",
+        "relatedStocks": null,
+        "disclosureClass": "ODA",
+        "disclosureType": "ODA",
+        "disclosureCategory": "ODA",
+        "publishDate": "2026.11.17 14:53:07",
+        "disclosureId": "4028328ca17e4f5e01a1e95908da5267",
+        "disclosureIndex": 1699030,
+        "summary": "Haber ve Söylentilere İlişkin Açıklama",
+        "attachmentCount": 0,
+        "isLate": false,
+        "senderType": "IGS",
+        "isBlocked": false
+      },
+      "disclosureDetail": { "memberType": "IGS" }
+    },
+    "disclosureBody": ["<p>Son günlerde bazı basın ve yayın organlarında ...</p>"],
+    "attachments": []
+  }
+]

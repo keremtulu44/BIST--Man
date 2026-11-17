@@ -8,10 +8,14 @@ kural tabanlı skorlayan ve bildirim kanallarına dağıtan hat.
 
 | Faz | İçerik | Durum |
 |---|---|---|
-| 0 | Saf ayrıştırma + triyaj + config (`pytest`: 53 test) | ✅ |
-| 1 | borsapy adaptörü + fixture + elle doğrulama | ⏳ sırada |
-| 2 | KAP firehose + DB + dedup | |
-| 3–5 | Features, fiyat/event study, kural skor, Telegram | |
+| 0 | Saf ayrıştırma, triyaj, config | ✅ |
+| 2a | KAP firehose istemcisi + ayrıştırıcılar (gerçek fixture, mock transport) | ✅ |
+| 2b | Unvan→kod eşleme + oran/ceza motoru | ✅ |
+| 1 | borsapy adaptörü + TTM elle doğrulama | ⏳ sırada (ağ gerekir) |
+| 2c | Postgres şeması + dedup + cursor | |
+| 3–5 | Event study, kural skor, Telegram | |
+
+`pytest`: **101 test**, ağ erişimi gerektirmez.
 
 ## Dokümanlar
 
@@ -37,8 +41,12 @@ src/bistman/
 │   ├── dates.py     # KAP'ın 3 farklı tarih formatı -> UTC
 │   └── text.py      # tr_lower / name_norm (İ/I tuzağı)
 ├── triage.py        # ÖDA/FR/DKB -> pipeline | fundamentals_refresh | routine | mechanical
+├── features.py      # oranlar (ciro/PD/net kâr) + çarpımsal confidence cezaları
+├── ticker_map.py    # unvan -> ticker (exact + fuzzy + belirsizlik reddi)
 ├── config.py        # config/universe.toml yükleyici
-└── sources/base.py  # Protocol'ler (DisclosureFeed, FundamentalsSource, UniverseSource)
+└── sources/
+    ├── base.py      # Protocol'ler + DisclosureStub/Detail/ParseResult
+    └── kap.py       # firehose: list/light, detail, member_history + retry/backoff
 ```
 
 ## Tasarım kuralları (kısaca)

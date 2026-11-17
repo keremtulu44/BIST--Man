@@ -86,3 +86,29 @@ class UniverseSource(Protocol):
     async def tickers(self) -> Sequence[str]:
         """Endeks bileşenleri (XU050). Boş dönerse config fallback'i devreye girer."""
         ...
+
+
+@dataclass(frozen=True, slots=True)
+class DisclosureDetail:
+    """Detay ucunun (`/api/notification/attachment-detail/{idx}`) iç modeli."""
+
+    stub: DisclosureStub
+    body_html: str
+    attachment_count: int
+    is_late: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class ParseResult:
+    """Ayrıştırma sonucu: sessizce satır düşürmemek için reddedilenleri de taşır.
+
+    `items` boş + `rejected` boş ise bu "haber yok" DEĞİL, **şüpheli** demektir
+    (MIMARI.md §2 — sessiz ölüm). Çağıran katman boşluğu firehose ile çapraz
+    kontrol etmekle yükümlü.
+    """
+
+    items: list[DisclosureStub]
+    rejected: list[tuple[int, str]] = field(default_factory=list)
+
+    def __len__(self) -> int:
+        return len(self.items)
