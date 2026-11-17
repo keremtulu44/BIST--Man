@@ -29,7 +29,7 @@ MAGNITUDE = {
 CURRENCY = {
     "tl": "TRY", "try": "TRY", "₺": "TRY", "türk lirası": "TRY",
     "usd": "USD", "dolar": "USD", "$": "USD", "abd doları": "USD",
-    "eur": "EUR", "euro": "EUR", "€": "EUR",
+    "eur": "EUR", "euro": "EUR", "€": "EUR", "avro": "EUR",
     "gbp": "GBP", "sterlin": "GBP", "£": "GBP",
 }
 
@@ -38,7 +38,9 @@ CURRENCY = {
 # aksi hâlde motor "3"ü eşleyip ".5 milyar"ı atlar ve tutarı 5 milyar okur.
 _NUM = r"(?:\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+\.\d{1,2}|\d+(?:,\d+)?)"
 _MAG = r"(?:bin|milyon|milyar|trilyon)"
-_CUR = r"(?:TL|TRY|₺|USD|EUR|GBP|₤|£|\$|dolar|euro|sterlin|türk\s+lirası|abd\s+doları)"
+_CUR = (
+    r"(?:TL|TRY|₺|USD|EUR|GBP|₤|£|\$|dolar|euro|avro|sterlin|türk\s+lirası|abd\s+doları)"
+)
 
 # (?<![\d.,]) -> bir sayının ORTASINDAN eşleşmeye başlamayı engeller
 # curpre -> "₺1.500.000", "$ 5 milyon" gibi ÖN EK para birimleri

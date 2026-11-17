@@ -20,6 +20,8 @@ FX = {"USD": Decimal("34.50"), "EUR": Decimal("37.10")}
          Decimal("15000000000"), "TRY"),
         ("1,2 milyar TL tutarında yatırım kararı alınmıştır.", Decimal("1200000000"), "TRY"),
         ("500 milyon dolar tutarında kredi sağlanmıştır.", Decimal("500000000"), "USD"),
+        # 'Avro' KAP metinlerinde yaygın; eşanlamlı listesinde yoktu -> no_amount
+        ("45 milyon Avro tutarında sözleşme", Decimal("45000000"), "EUR"),
         ("1.234,56 TL ceza kesilmiştir.", Decimal("1234.56"), "TRY"),
         ("Şirket 250 bin TL sermaye artırımı yapacaktır.", Decimal("250000"), "TRY"),
         ("₺1.500.000 bedelli sermaye artırımı yapılacaktır.", Decimal("1500000"), "TRY"),
