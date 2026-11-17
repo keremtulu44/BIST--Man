@@ -9,6 +9,23 @@
 
 ---
 
+
+## ⚠️ Doğrulama bulguları (17.11.2026 — kullanıcının makinesi, gerçek veri)
+
+Aşağıdakiler bu dokümanın yukarıdaki bölümlerini **geçersiz kılar**. Gerçek
+çalıştırma raporu: `docs/dogrulama-sonuc.json`.
+
+| Alan | Beklenen | Gerçek | Sonuç |
+|---|---|---|---|
+| `ttm_income_stmt` | TTM | 4 çeyrek sütununun toplamı; tablo **kümülatif** olduğu için **2x fazla** (THYAO 2.72 trilyon vs ~1.36 trilyon) | Kullanılmıyor. `analysis/ttm.py` kendi hesabını yapıyor |
+| Kalem adı eşleşmesi | `faiz gelirleri` yeter | AKBNK'ta `1.7 Diğer Faiz Gelirleri` (alt kalem) eşleşti | `select_row` üst kalem (Roma rakamlı) tercih ediyor |
+| `fast_info` | PD, F/K, fiyat | **`{}` boş** (iki hissed de) | `no_market_cap` bayrağı; fiyat `history()`'den alınacak |
+| Çeyreklik sütun biçimi | tekil çeyrek | `2026Q2` = ilk 6 ay (YTD) | TTM = FY + YTD − YTD(geçen yıl) |
+
+**Ders:** borsapy TTM'i kendi içinde tutarlıydı (TTM == 4 sütun toplamı, fark
+%0.0000). Tutarlılık doğruluk değil — yıllık tabloyla karşılaştırmadan
+"doğrulandı" denmez.
+
 ## 1. Tek cümlelik sonuç
 
 **borsapy iyi bir "detay" katmanı, kötü bir "firehose".**

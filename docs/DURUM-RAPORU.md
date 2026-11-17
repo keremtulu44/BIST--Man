@@ -23,7 +23,7 @@ oturuyor.
 | Commit | 10 |
 | Takip edilen dosya | 38 |
 | Python satırı (src + tests) | 2.474 |
-| Test | **204**, tamamı geçiyor, ağ erişimi yok |
+| Test | **243**, tamamı geçiyor, ağ erişimi yok |
 | Süre | ~0.24 s |
 | Gerçek KAP yanıtı fixture | 2 (`list_light_sample.json`, `detail_1699030.json`) |
 | Dış bağımlılık (runtime) | yok (yalnız `httpx`; `borsapy` Faz 1'de) |
@@ -31,9 +31,10 @@ oturuyor.
 Test dağılımı:
 
 ```
-test_money 21 · test_triage 29 · test_kap_table 29 · test_features 18 · test_kap_source 20
-test_scoring 16 · test_event_study 15 · test_pipeline_e2e 14 · test_ticker_map 9
-test_dates 8 · test_calibration 8 · test_notify 7 · test_config 4 · test_text 4
+test_money 21 · test_triage 29 · test_kap_table 29 · test_ttm 15 · test_features 18
+test_kap_source 20 · test_scoring 16 · test_borsapy_src 24 · test_event_study 15
+test_pipeline_e2e 14 · test_ticker_map 9 · test_dates 8 · test_calibration 8
+test_notify 7 · test_config 4 · test_text 4
 ```
 
 ---
@@ -57,6 +58,14 @@ okumasıyla teyit edildi; projenin geri kalanını bunlar şekillendirdi.
 | **B10** | 4 satırda **çok sembol** (`BERA+MTRKS`, `KRGYO+MTRKS`): piyasa geneli duyurular | Gerçek HTML tablo | Kalibrasyonda çift atıf = kirli CAR; atıf politikası açık olmalı |
 | **B11** | Bildirim gövdesi düz metin değil **GWT HTML**, her cümle `content-tr` + `content-en` olarak **iki kez** | Gerçek detay yanıtı (22 KB) | İngilizce kopya atılmazsa aynı tutar iki kez görünür; `body_text` %80 küçültüyor |
 | **B12** | Tabloda unvan ve konu **tek hücrede** birleşik; tarih bazen `Bugün 14:53` | Gerçek HTML tablo | Unvan ayrıştırılmazsa eşleştirme şişer; göreli tarih enjekte edilebilir `today` ile çözülür |
+| **B13** | **borsapy TTM'i 2x fazla sayıyor.** Çeyreklik tablo KÜMÜLATİF (YTD); borsapy 4 sütunu topluyor. THYAO: 2.72 trilyon vs gerçek ~1.36 trilyon | Kullanıcının makinesinde gerçek çalıştırma; 8 çeyrek + yıllık tablo karşılaştırması | Tüm oranların paydası 2x yanlış olacaktı → haber olduğundan **küçük görünür**, sistem susar. `analysis/ttm.py` kümülatifi tespit edip FY+YTD−YTD hesabı yapıyor |
+| **B14** | **Satır seçimi tuzağı:** `faiz gelirleri` araması AKBNK'ta `1.7 Diğer Faiz Gelirleri` (alt kalem, 4.3 mlr) seçti; doğrusu `I. FAİZ GELİRLERİ`. Payda ~40x yanlış | Aynı rapor | `sources/borsapy_src.select_row`: Roma rakamlı üst kalem +, `diğer/alt` −, alt-numaralı (1.7) − |
+| **B15** | **`fast_info` BOŞ döndü** (`{}`) — hem THYAO hem AKBNK. PD/F/K yok | Aynı rapor | `ratio_mcap` sessizce `None` olacaktı; `no_market_cap` bayrağı var, `dogrulama2` fiyatın nerede olduğunu arıyor |
+| **B16** | borsapy TTM'i **kendi içinde tutarlı** (TTM == 4 sütun toplamı, fark %0.0000) ama **yanlış** | Aynı rapor | "Tutarlılık testi geçti" ≠ "sayı doğru". Doğrulama kriteri: yıllık tabloyla karşılaştırma |
+
+**B13 projenin en pahalı hatasını önledi:** doğrulama olmasaydı sistem "her haber
+küçük" diye susacak, kimse nedenini anlamayacaktı — çünkü kod çalışıyor, testler
+geçiyor, sayı tutarlı. Sadece yanlış.
 
 **B8 + B9 backfill parser'ını belirledi:** satır şeması artık testle kilitli
 (`tests/test_kap_table.py`, 29 test) — KAP sütun eklerse `KapTableError`, sessizce
