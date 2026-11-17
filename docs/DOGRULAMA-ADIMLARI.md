@@ -43,7 +43,23 @@ git pull
 
 ---
 
-## 2. Python ortamı
+## 2. Python ortamı — İKİ YOL VAR
+
+### Yol A (önerilen): tek komut, aktivasyon yok
+
+```powershell
+cd C:\BIST--Man
+powershell -ExecutionPolicy Bypass -File .\scripts\dogrulama\kur_ve_calistir.ps1
+```
+
+Script venv'i kurar, borsapy'yi kurar, doğrulamayı çalıştırır. `Activate.ps1`
+ile uğraşmaz: her şey `.venv\Scripts\python.exe` üzerinden doğrudan çağrılır.
+
+### Yol B: elle
+
+`pip install` **yanlış Python'a** gidebilir; `Activate.ps1` yeni pencerede
+kendiliğinden aktif olmaz. En güvenlisi, aktivasyonu hiç kullanmamak:
+`
 
 ```powershell
 py --version          # 3.11 veya üstü olmalı
@@ -66,6 +82,17 @@ pip install borsapy==0.11.0
 ```
 
 > `Set-ExecutionPolicy` sadece bu PowerShell penceresi için; sistemi kalıcı değiştirmez.
+
+---
+
+Sorun çıkarsa teşhis:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\dogrulama\kontrol.ps1
+```
+
+Bu, hangi Python'ların kurulu olduğunu ve borsapy'nin **hangi** Python'da
+göründüğünü tek tek yazar.
 
 ---
 

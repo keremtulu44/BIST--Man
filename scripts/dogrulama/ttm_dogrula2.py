@@ -208,7 +208,11 @@ def main() -> int:
     try:
         import borsapy as bp
     except ImportError:
-        print("[HATA] borsapy kurulu değil:  pip install borsapy==0.11.0")
+        print("[HATA] borsapy bu Python'da kurulu DEĞİL.")
+        print(f"       Python: {sys.executable}")
+        print("       Doğru komut (aktivasyon gerekmez):")
+        print(f'       "{sys.executable}" -m pip install "borsapy==0.11.0"')
+        print(f'       "{sys.executable}" scripts\\dogrulama\\ttm_dogrula2.py')
         return 2
 
     print(f"borsapy {getattr(bp, '__version__', '?')} | python {RESULT['python']}")
