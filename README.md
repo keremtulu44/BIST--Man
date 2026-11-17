@@ -5,6 +5,7 @@ LLM ile skorlayan ve bildirim kanallarına dağıtan arka plan sistemi.
 
 ## Dokümanlar
 
+- **[docs/PLAN-V1.md](docs/PLAN-V1.md)** ← **v1 planı: BIST 50 + endeks + emtia, kural tabanlı, 6 aylık veriyle kalibre**
 - **[docs/MIMARI.md](docs/MIMARI.md)** — yazılım mimarisi, veri modeli, hata kataloğu, faz planı
 - **[docs/VERI-KATMANI-BORSAPY.md](docs/VERI-KATMANI-BORSAPY.md)** — aktif veri katmanı: borsapy + 4 sessiz tuzak
 - **[docs/VERI-KAYNAKLARI.md](docs/VERI-KAYNAKLARI.md)** — kaynak referansı: resmî API'ler, lisanslar

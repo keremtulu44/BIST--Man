@@ -24,6 +24,11 @@
 | D9 | LLM sağlayıcı | Arayüz sabit, sağlayıcı değişken; seçim golden set ile | ⏳ eval bekliyor (§6) |
 | D10 | Zaman | DB'de her şey UTC, sadece gösterimde TRT | ✅ kesin |
 | D11 | Deploy | tek container + managed Postgres | ✅ kesin |
+| D15 | Evren | BIST 50 + XU100/XBANK referansı + altın/gümüş/Brent | ✅ kesin (PLAN-V1 §1) |
+| D16 | Eşik kalibrasyonu | 6 aylık bildirim + anormal getiri (event study) | ✅ kesin (PLAN-V1 §2) |
+| D17 | Emtia | ayrı alarm akışı; hisse skoruyla aynı ölçekte DEĞİL | ✅ kesin (PLAN-V1 §1) |
+| D18 | LLM | v1'de yok; Faz 7'de Gemini/kendi wrapper | ✅ kesin |
+| D19 | Kanal | Telegram (v1) → web (Faz 6) | ✅ kesin |
 
 ---
 
