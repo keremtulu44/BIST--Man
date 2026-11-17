@@ -23,7 +23,7 @@ oturuyor.
 | Commit | 10 |
 | Takip edilen dosya | 38 |
 | Python satırı (src + tests) | 2.474 |
-| Test | **248**, tamamı geçiyor, ağ erişimi yok |
+| Test | **255**, tamamı geçiyor, ağ erişimi yok |
 | Süre | ~0.24 s |
 | Gerçek KAP yanıtı fixture | 2 (`list_light_sample.json`, `detail_1699030.json`) |
 | Dış bağımlılık (runtime) | yok (yalnız `httpx`; `borsapy` Faz 1'de) |
@@ -32,7 +32,7 @@ Test dağılımı:
 
 ```
 test_money 21 · test_triage 29 · test_kap_table 29 · test_ttm 15 · test_features 18
-test_kap_source 20 · test_scoring 16 · test_borsapy_src 29 · test_event_study 15
+test_kap_source 20 · test_scoring 16 · test_isyatirim_labels 36 · test_event_study 15
 test_pipeline_e2e 14 · test_ticker_map 9 · test_dates 8 · test_calibration 8
 test_notify 7 · test_config 4 · test_text 4
 ```
@@ -66,6 +66,10 @@ okumasıyla teyit edildi; projenin geri kalanını bunlar şekillendirdi.
 | **B18** | `MaliTablo` **üç tabloyu birden** döndürüyor (bilanço 1xxx/2xxx, gelir 3xxx, nakit akışı 4xxx): THYAO 133, AKBNK 192 kalem | Aynı rapor | `itemCode` ile filtre şart; yoksa nakit akışı kalemi gelir tablosu sanılır |
 | **B19** | Bu karışıklık somut hataya dönüştü: net kâr olarak `Dönem Karı Vergi Yükümlülüğü` seçildi (0.5 milyar) | Aynı rapor | `_HARD_NEGATIVE` (vergi/yükümlülük/ertelenmiş/dağılım/geçmiş yıl) → kalem **diskalfiye**, ceza yetmiyor |
 | **B20** | THYAO sanayi şablonunda kâr satırı `DÖNEM KARI (ZARARI)`; `Dönem Net Kar/Zararı` nakit akışı kalemi | Kalem dökümü (133 satır) | Eşleme tablosu artık gerçek adlarla sabit |
+| **B21** | **itemCode tablo ayrımı doğrulandı:** THYAO 23/33/43/34 (bilanço-aktif/pasif/gelir/nakit akışı); AKBNK 66/64/62 — **bankada nakit akışı tablosu yok** | `dogrulama-sonuc4` | `ROLE_TABLE` ile rol→tablo eşlemesi; bankada boş tablo tüm listeye düşer |
+| **B22** | `DÖNEM KARI (ZARARI)` **bilanço** kalemi (dağıtılmamış kâr, stok); gelir tablosundaki net kâr `SÜRDÜRÜLEN FAALİYETLER DÖNEM KARI/ZARARI` | Aynı rapor + kalem kodu 2N5 vs 3J | Tablo filtresi olmadan stok kalem akış sanılır; iki kavram karışır |
+| **B23** | **Özkaynak/aktif STOK kalem**: TTM'i olmaz. "TTM özkaynak" 1.40 trilyon çıktı, doğrusu son bilanço 1.02 trilyon | Aynı rapor | `compute_ttm(kind="stock")` → son değer; akış varsayımı %37 hata |
+| **B24** | **AKBNK 2025Q3 özkaynak/aktif = 0** (258.9 → 0 → 310.2). Sıfır değer değil, veri boşluğu | Aynı rapor | 0'lar eksik sayılır + `data_gap` bayrağı; `tutar/0` felaketi önlendi |
 
 **B13 projenin en pahalı hatasını önledi:** doğrulama olmasaydı sistem "her haber
 küçük" diye susacak, kimse nedenini anlamayacaktı — çünkü kod çalışıyor, testler
@@ -165,7 +169,7 @@ Tam liste: `TASARIM-DETAY.md §1`.
 | Sıra | İş | Kim |
 |---|---|---|
 | 1 | Kural skor (`config/scoring.toml`) + uçtan uca dikey dilim testi | ajan (ağsız) |
-| 2 | `borsapy_src.py` adaptörü (to_thread + limiter) + TTM doğrulama | ajan yazar, **sen çalıştırırsın** |
+| 2 | `isyatirim_labels.py` adaptörü (to_thread + limiter) + TTM doğrulama | ajan yazar, **sen çalıştırırsın** |
 | 3 | `member_history` HTML parser (gerçek HTML fixture'ı ile) | ajan + sen (1 kayıt) |
 | 4 | Postgres şeması + dedup/cursor + reaper | ajan |
 | 5 | Gerçek veriyle kalibrasyon (1 yıl, 50 hisse) → eşik kararı | ajan + sen |

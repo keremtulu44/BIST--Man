@@ -29,6 +29,19 @@ Doğru TTM:
 
     KÜMÜLATİF:  TTM = FY(son tam yıl) + YTD(güncel) - YTD(geçen yıl aynı dönem)
     TEKİL:      TTM = Σ son 4 çeyrek
+
+İkinci bulgu (17.11.2026, aynı rapor): **her kalem akış değil.**
+
+    AKIŞ  (revenue, net_income)  -> dönem boyunca birikir -> TTM anlamlı
+    STOK  (equity, total_assets) -> bilanço tarihindeki durum -> **TTM anlamsız**
+
+THYAO özkaynağı "TTM" diye hesaplanınca 1.40 trilyon çıktı; gerçek değer son
+bakış 1.02 trilyon. Stok kalemde 4 çeyreği toplamak/çıkarmak, dört ayrı fotoğrafı
+toplayıp tek fotoğraf sanmaktır. Stoklar için `latest_value` kullanılır.
+
+Üçüncü bulgu: AKBNK 2025Q3 özkaynak/aktif değerleri **0** geldi (258.9 → 0 → 310.2).
+Bir çeyrekte sıfırlanıp geri gelen bilanço = veri boşluğu. 0'ı gerçek değer saymak
+`tutar / 0` demek; 0'lar eksik kabul edilir ve `data_gap` bayrağı bırakılır.
 """
 
 from __future__ import annotations
@@ -37,16 +50,22 @@ from dataclasses import dataclass, field
 from typing import Iterable, Literal, Sequence
 
 __all__ = [
+    "Kind",
     "Mode",
     "TTM",
     "compute_ttm",
     "detect_mode",
+    "latest_value",
+    "split_zeros",
     "from_cumulative",
     "from_standalone",
     "naive_borsapy_ttm",
 ]
 
-Mode = Literal["cumulative", "standalone", "unknown"]
+Mode = Literal["cumulative", "standalone", "unknown", "stock"]
+
+Kind = Literal["flow", "stock"]
+"""flow: dönem boyunca birikir (gelir, kâr). stock: bir andaki durum (özkaynak, aktif)."""
 
 # Yıllık tablo ile çeyreklik tablo arasında eşitlik toleransı (%)
 _EQUAL_TOL = 0.005
@@ -74,6 +93,7 @@ class TTM:
     points_used: tuple[str, ...] = ()
     flags: tuple[str, ...] = field(default_factory=tuple)
     note: str = ""
+    kind: str = "flow"
 
     @property
     def reliable(self) -> bool:
@@ -142,7 +162,7 @@ def detect_mode(
 
 
 def from_standalone(points: Sequence[TTMPoint]) -> TTM:
-    pts = _sort(points)
+    pts, zeros = split_zeros(_sort(points))
     if len(pts) < 4:
         return TTM(None, "standalone", tuple(p.label for p in pts), ("ttm_gap",), "4 çeyrekten az gözlem")
     last4 = pts[-4:]
@@ -150,6 +170,8 @@ def from_standalone(points: Sequence[TTMPoint]) -> TTM:
         (b.year, b.quarter) != _next_quarter(a.year, a.quarter) for a, b in zip(last4, last4[1:])
     )
     flags = ("ttm_gap",) if gap else ()
+    if zeros:
+        flags = flags + ("data_gap",)
     return TTM(
         sum(p.value for p in last4),
         "standalone",
@@ -161,7 +183,7 @@ def from_standalone(points: Sequence[TTMPoint]) -> TTM:
 
 def from_cumulative(points: Sequence[TTMPoint]) -> TTM:
     """TTM = FY(son tam yıl) + YTD(güncel) - YTD(geçen yıl aynı dönem)."""
-    pts = _sort(points)
+    pts, zeros = split_zeros(_sort(points))
     if not pts:
         return TTM(None, "cumulative", (), ("ttm_gap",), "gözlem yok")
 
@@ -198,6 +220,8 @@ def from_cumulative(points: Sequence[TTMPoint]) -> TTM:
     value = fy.value + ytd_now.value - prev.value
     if ytd_now.value < 0 or prev.value < 0:
         flags.append("ttm_gap")  # zarar dönemi: aritmetik doğru ama yorum zor
+    if zeros:
+        flags.append("data_gap")
     return TTM(
         value,
         "cumulative",
@@ -212,8 +236,14 @@ def compute_ttm(
     annual: dict[int, float] | None = None,
     *,
     monotonic_assumption: bool = True,
+    kind: Kind = "flow",
 ) -> TTM:
-    """Tek giriş noktası: modu tespit edip doğru TTM'i hesaplar."""
+    """Tek giriş noktası: kalem türüne göre doğru değeri hesaplar.
+
+    kind="stock" -> son bilanço değeri (TTM hesaplanmaz).
+    """
+    if kind == "stock":
+        return latest_value(points)
     mode, reason = detect_mode(points, annual)
     if mode == "cumulative":
         result = from_cumulative(points)
@@ -225,7 +255,14 @@ def compute_ttm(
     flags = result.flags
     if mode == "cumulative" and "yıllık" not in reason and "varsayımı" in reason and monotonic_assumption:
         flags = flags + ("assumed_mode",)
-    return TTM(result.value, result.mode, result.points_used, flags, f"{reason}; {result.note}")
+    return TTM(
+        result.value,
+        result.mode,
+        result.points_used,
+        flags,
+        f"{reason}; {result.note}",
+        kind="flow",
+    )
 
 
 def naive_borsapy_ttm(points: Sequence[TTMPoint]) -> float | None:
@@ -237,6 +274,35 @@ def naive_borsapy_ttm(points: Sequence[TTMPoint]) -> float | None:
     if len(pts) < 4:
         return None
     return sum(p.value for p in pts[-4:])
+
+
+def split_zeros(points: Sequence[TTMPoint]) -> tuple[list[TTMPoint], list[str]]:
+    """0 değerli gözlemleri ayırır (bilanço çeyreğinde sıfır = veri boşluğu)."""
+    kept = [p for p in points if p.value != 0]
+    zeros = [p.label for p in points if p.value == 0]
+    return kept, zeros
+
+
+def latest_value(points: Sequence[TTMPoint]) -> TTM:
+    """STOK kalemler için: son geçerli gözlem (TTM hesaplanmaz).
+
+    Neden: özkaynak/aktif bir dönem akışı değil, bilanço tarihindeki durumdur.
+    Son dört çeyreği toplamak dört fotoğrafı üst üste bindirmektir.
+    """
+    pts, zeros = split_zeros(_sort(points))
+    flags: list[str] = []
+    if zeros:
+        flags.append("data_gap")
+    if not pts:
+        return TTM(None, "stock", (), tuple(flags) + ("no_value",), "geçerli gözlem yok")
+    last = pts[-1]
+    return TTM(
+        last.value,
+        "stock",
+        (last.label,),
+        tuple(flags),
+        f"son bilanço değeri ({last.label})" + (f"; {len(zeros)} sıfır atıldı" if zeros else ""),
+    )
 
 
 def _next_quarter(year: int, quarter: int) -> tuple[int, int]:

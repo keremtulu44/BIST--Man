@@ -1,4 +1,4 @@
-"""Satır seçimi + TTM birleştirme — GERÇEK kalem adları ve GERÇEK sayılarla.
+"""Satır seçimi + tablo ayrımı + TTM — GERÇEK kalem adları ve sayılarla.
 
 Etiketler kullanıcının makinesindeki doğrulama raporundan alındı
 (`docs/dogrulama-sonuc.json`, THYAO + AKBNK, 17.11.2026).
@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from bistman.sources.borsapy_src import (
+from bistman.sources.isyatirim_labels import (
     annual_values,
     fold,
     fundamentals_from_frames,
@@ -262,3 +262,94 @@ def test_tax_item_never_wins_for_net_income_even_alone() -> None:
     lonely = ["  Dönem Karı Vergi Yükümlülüğü", "  Geçmiş Yıllar Kar/Zararları"]
     pick = select_row(lonely, "net_income")
     assert pick.label is None
+
+
+# --------------------------- GERÇEK yanıt: itemCode tablo ayrımı (17.11.2026)
+
+# THYAO: 23 bilanço-aktif, 33 bilanço-pasif, 43 gelir, 34 nakit akış — 133 kalem.
+# AKBNK: 66 aktif, 64 pasif, 62 gelir (banka şablonunda nakit akışı YOK).
+THYAO_CODES = {
+    "Satış Gelirleri": "3C",
+    "SÜRDÜRÜLEN FAALİYETLER DÖNEM KARI/ZARARI": "3J",
+    "DÖNEM KARI (ZARARI)": "2N5",          # bilanço: dağıtılmamış kâr (STOK)
+    "  Dönem Karı Vergi Yükümlülüğü": "4B",  # nakit akışı
+    "Özkaynaklar": "2N",
+    "TOPLAM VARLIKLAR": "1BL",
+}
+
+
+def test_table_filter_prevents_balance_sheet_profit_as_net_income() -> None:
+    """KRİTİK: 'DÖNEM KARI (ZARARI)' bilançoda da var (dağıtılmamış kâr).
+
+    Tablo filtresi olmadan gelir tablosundaki gerçek net kâr yerine bu seçilir;
+    ikisi farklı kavram (stok vs akış) ve farklı sayı.
+    """
+    labels = list(THYAO_CODES)
+    codes = list(THYAO_CODES.values())
+
+    without = select_row(labels, "net_income")
+    with_filter = select_row(labels, "net_income", codes)
+
+    assert without.label == "DÖNEM KARI (ZARARI)"
+    assert with_filter.label == "SÜRDÜRÜLEN FAALİYETLER DÖNEM KARI/ZARARI"
+
+
+def test_table_filter_keeps_income_rows_for_revenue() -> None:
+    labels = list(THYAO_CODES)
+    codes = list(THYAO_CODES.values())
+    assert select_row(labels, "revenue", codes).label == "Satış Gelirleri"
+
+
+def test_table_filter_routes_balance_roles_to_balance_sheets() -> None:
+    labels = list(THYAO_CODES)
+    codes = list(THYAO_CODES.values())
+    assert select_row(labels, "equity", codes).label == "Özkaynaklar"
+    assert select_row(labels, "total_assets", codes).label == "TOPLAM VARLIKLAR"
+
+
+def test_table_filter_falls_back_when_table_empty() -> None:
+    """Banka şablonunda nakit akışı yok: filtre boş kalırsa tüm listeye düşmeli."""
+    labels = ["I. FAİZ GELİRLERİ", "XXIII. NET DÖNEM KARI/ZARARI (XVII+XXII)"]
+    codes = ["3A", "3Z"]
+    assert select_row(labels, "revenue", codes).label == "I. FAİZ GELİRLERİ"
+
+
+# ------------------------------- STOK kalem: TTM değil son bilanço değeri
+
+THYAO_EQUITY = [  # gerçek (milyar TL)
+    (2024, 3, 618.691), (2024, 4, 890.084), (2025, 1, 717.436), (2025, 2, 752.120),
+    (2025, 3, 843.951), (2025, 4, 1132.848), (2026, 1, 966.363), (2026, 2, 1018.453),
+]
+
+
+def test_stock_role_uses_latest_balance_not_ttm() -> None:
+    """Özkaynak TTM'i 1.40 trilyon çıkıyordu; doğrusu son bilanço 1.02 trilyon."""
+    from bistman.analysis.ttm import TTMPoint, compute_ttm
+
+    points = [TTMPoint(y, q, v) for y, q, v in THYAO_EQUITY]
+    stock = compute_ttm(points, kind="stock")
+    flow = compute_ttm(points)
+
+    assert stock.value == pytest.approx(1018.453)
+    assert stock.mode == "stock"
+    assert flow.value != pytest.approx(stock.value)  # akış varsayımı yanlış sonuç verir
+
+
+def test_stock_treats_zero_as_data_gap() -> None:
+    """AKBNK 2025Q3 özkaynak/aktif = 0 geldi: sıfır değer değil, veri boşluğu."""
+    from bistman.analysis.ttm import TTMPoint, latest_value
+
+    points = [
+        TTMPoint(2025, 2, 258.901),
+        TTMPoint(2025, 3, 0.0),
+        TTMPoint(2025, 4, 310.158),
+    ]
+    result = latest_value(points)
+    assert result.value == pytest.approx(310.158)
+    assert "data_gap" in result.flags
+
+
+def test_zero_only_series_returns_no_value() -> None:
+    from bistman.analysis.ttm import TTMPoint, latest_value
+
+    assert latest_value([TTMPoint(2025, 3, 0.0)]).value is None

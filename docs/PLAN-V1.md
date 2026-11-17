@@ -163,7 +163,7 @@ push_score  = impact × confidence        → eşik §2.2'den
 | Faz | İçerik | Bitiş kriteri | Süre |
 |---|---|---|---|
 | **0** ✅ | `money.py` + `features.py` TTM doğrulama + testler | 40+ örnek, ağ yok | — |
-| **1** | `borsapy_src.py` (to_thread köprüsü, limiter) + 5 hisse fixture + **elle doğrulama** | THYAO/AKBNK TTM = KAP'taki rapor | 1-2 gün |
+| **1** | `isyatirim_labels.py` (to_thread köprüsü, limiter) + 5 hisse fixture + **elle doğrulama** | THYAO/AKBNK TTM = KAP'taki rapor | 1-2 gün |
 | **2 (kritik)** | **6 aylık bildirim backfill deneyi** (§3) | 26 pencere çekildi VEYA fallback kararı | 0.5 gün |
 | **3** | `kap_firehose` + `disclosure`/`disclosure_ticker` + dedup + reaper | 24 saat kesintisiz, 0 duplike | 2-3 gün |
 | **4** | Fiyat geçmişi (XU100 + 50 hisse) + **event study** (§2) — *motor hazır ✅, veri bekliyor* | Varyant tablosu dolu, karar verilmiş | 1-2 gün |

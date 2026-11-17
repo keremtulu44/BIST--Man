@@ -51,7 +51,7 @@ src/bistman/
 ├── pipeline.py      # uçtan uca hat: triyaj -> hisse -> oran -> skor -> bildirim
 ├── notify.py        # Telegram (parse_mode YOK, 4000'e böler, 429'a uyar) + FakeNotifier
 ├── analysis/ttm.py      # kümülatif/tekil tespiti + doğru TTM (borsapy 2x hatalı çıktı)
-├── sources/borsapy_src.py  # kalem seçici (Roma rakamlı üst kalem) + tablo birleştirme
+├── sources/isyatirim_labels.py  # kalem seçici (Roma rakamlı üst kalem) + tablo birleştirme
 ├── analysis/
 │   ├── event_study.py   # t0 seçimi, CAR (endeks arındırılmış), z (oynaklık normalize)
 │   └── calibration.py   # eşik × günlük bütçe ızgarası -> isabet/kaçan tablosu

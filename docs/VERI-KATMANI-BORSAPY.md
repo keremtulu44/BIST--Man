@@ -87,7 +87,7 @@ Kodda tek bir `async def` yok; tüm provider'lar `httpx.Client` kullanıyor.
 Bizim poller/worker'lar asyncio. Köprü:
 
 ```python
-# sources/borsapy_src.py
+# sources/isyatirim_labels.py
 _LIMITER = asyncio.Semaphore(4)          # eşzamanlı dış istek tavanı
 
 async def _call(fn, /, *a, **kw):
@@ -172,7 +172,7 @@ Kişisel proje için sorun değil, ama:
 2. `pip install --require-hashes` (requirements + hash).
 3. Otomatik güncelleme yok (`dependabot` kapat). Upgradeler **elle**:
    yeni sürüm → fixture testleri → replay karşılaştırması (§6).
-4. Tüm borsapy çağrıları `sources/borsapy_src.py` içinde. Başka dosyada
+4. Tüm borsapy çağrıları `sources/isyatirim_labels.py` içinde. Başka dosyada
    `import borsapy` yok (`grep` ile denetlenebilir kural). Paket bozulursa ya
    da lisans değişirse **tek dosya** değişir.
 5. `httpx.Client` sızıntısı: kendi `Ticker` nesneni yaratıp tutmuyorsan sorun
@@ -208,14 +208,14 @@ Testler iki katmanlı:
 src/bistman/
 ├── sources/
 │   ├── base.py                # Protocol'ler (DisclosureSource, FundamentalsSource, ...)
-│   ├── borsapy_src.py         # TEK borsapy temas noktası + to_thread köprüsü + limiter
+│   ├── isyatirim_labels.py         # TEK borsapy temas noktası + to_thread köprüsü + limiter
 │   ├── kap_firehose.py        # piyasa geneli bildirim akışı (borsapy'de YOK)
 │   └── fixtures_src.py        # test için sabit veri
 ├── features.py                # TTM doğrulama, oranlar, cezalar (§4.3)
 └── ...
 ```
 
-`borsapy_src.py` içindeki arayüz (~imza):
+`isyatirim_labels.py` içindeki arayüz (~imza):
 
 ```python
 class BorsapyFundamentals:
@@ -239,7 +239,7 @@ class BorsapyDisclosures:                            # sadece detay, firehose de
 | Faz | İçerik | Bitiş kriteri |
 |---|---|---|
 | **0** | `money.py` (hazır ✅) + `features.py` TTM doğrulama + testler | 40+ örnek, ağ yok |
-| **1** | `borsapy_src.py` + fixture kaydı: 3 hisse × (TTM, bilanço, fiyat) | Fixture'lar var, 3 hisse sayıları elle doğrulandı |
+| **1** | `isyatirim_labels.py` + fixture kaydı: 3 hisse × (TTM, bilanço, fiyat) | Fixture'lar var, 3 hisse sayıları elle doğrulandı |
 | **2** | `kap_firehose.py` + `disclosure` tablosu + dedup | 24 saat kesintisiz, 0 duplike |
 | **3** | Features (firehose metni + borsapy finansalları) + kural skor + Telegram | Uçtan uca bildirim, LLM'siz |
 | **4** | LLM + replay + eşik kalibrasyonu | Golden set ile ölçülmüş |
