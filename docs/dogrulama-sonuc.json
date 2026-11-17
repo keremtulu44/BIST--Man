@@ -1,0 +1,120 @@
+{
+  "calisma_zamani_utc": "2026-11-17T12:43:51+00:00",
+  "python": "3.14.6",
+  "kontroller": [
+    {
+      "durum": "OK",
+      "baslik": "THYAO gelir tablosu alındı",
+      "detay": "satır=43, sütun=['2025', '2024', '2023', '2022']"
+    },
+    {
+      "durum": "INFO",
+      "baslik": "THYAO çeyreklik sütunlar",
+      "detay": "2026Q2, 2026Q1, 2025Q4, 2025Q3, 2025Q2, 2025Q1"
+    },
+    {
+      "durum": "OK",
+      "baslik": "THYAO son 4 çeyrek ARDIŞIK",
+      "detay": "[(2026, 2), (2026, 1), (2025, 4), (2025, 3)]"
+    },
+    {
+      "durum": "INFO",
+      "baslik": "THYAO ciro adayı satırlar",
+      "detay": "Satış Gelirleri"
+    },
+    {
+      "durum": "INFO",
+      "baslik": "THYAO kâr adayı satırlar",
+      "detay": "(bulunamadı)"
+    },
+    {
+      "durum": "INFO",
+      "baslik": "THYAO 'Satış Gelirleri' son 4 çeyrek",
+      "detay": "585,069,000,000, 257,961,000,000, 1,187,816,196,737, 690,825,000,000"
+    },
+    {
+      "durum": "OK",
+      "baslik": "THYAO borsapy TTM alındı",
+      "detay": "satır=43, sütun=['TTM']"
+    },
+    {
+      "durum": "OK",
+      "baslik": "THYAO TTM == 4 çeyrek toplamı? EVET",
+      "detay": "borsapy TTM=2,721,671,196,737\nbizim toplam=2,721,671,196,737\nfark=%0.0000"
+    },
+    {
+      "durum": "OK",
+      "baslik": "THYAO fast_info",
+      "detay": "{}"
+    },
+    {
+      "durum": "OK",
+      "baslik": "AKBNK gelir tablosu alındı",
+      "detay": "satır=62, sütun=['2025', '2024', '2023', '2022']"
+    },
+    {
+      "durum": "INFO",
+      "baslik": "AKBNK çeyreklik sütunlar",
+      "detay": "2026Q2, 2026Q1, 2025Q4, 2025Q3, 2025Q2, 2025Q1"
+    },
+    {
+      "durum": "OK",
+      "baslik": "AKBNK son 4 çeyrek ARDIŞIK",
+      "detay": "[(2026, 2), (2026, 1), (2025, 4), (2025, 3)]"
+    },
+    {
+      "durum": "INFO",
+      "baslik": "AKBNK ciro adayı satırlar",
+      "detay": "1.7 Diğer Faiz Gelirleri\nI. FAİZ GELİRLERİ"
+    },
+    {
+      "durum": "INFO",
+      "baslik": "AKBNK kâr adayı satırlar",
+      "detay": "XXIII. NET DÖNEM KARI/ZARARI (XVII+XXII)"
+    },
+    {
+      "durum": "INFO",
+      "baslik": "AKBNK '1.7 Diğer Faiz Gelirleri' son 4 çeyrek",
+      "detay": "1,004,000,000, 455,432,000, 1,838,760,000, 974,000,000"
+    },
+    {
+      "durum": "OK",
+      "baslik": "AKBNK borsapy TTM alındı",
+      "detay": "satır=62, sütun=['TTM']"
+    },
+    {
+      "durum": "OK",
+      "baslik": "AKBNK TTM == 4 çeyrek toplamı? EVET",
+      "detay": "borsapy TTM=4,272,192,000\nbizim toplam=4,272,192,000\nfark=%0.0000"
+    },
+    {
+      "durum": "INFO",
+      "baslik": "AKBNK 'XXIII. NET DÖNEM KARI/ZARARI (XVII+XXII)' TTM",
+      "detay": "149,719,636,000"
+    },
+    {
+      "durum": "OK",
+      "baslik": "AKBNK fast_info",
+      "detay": "{}"
+    }
+  ],
+  "borsapy": "0.11.0",
+  "ttm": {
+    "THYAO": {
+      "row": "Satış Gelirleri",
+      "borsapy_ttm": 2721671196737.0,
+      "our_sum": 2721671196737.0,
+      "diff_pct": 0.0
+    },
+    "AKBNK": {
+      "row": "1.7 Diğer Faiz Gelirleri",
+      "borsapy_ttm": 4272192000.0,
+      "our_sum": 4272192000.0,
+      "diff_pct": 0.0
+    }
+  },
+  "market": {
+    "THYAO": {},
+    "AKBNK": {}
+  }
+}
