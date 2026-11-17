@@ -166,7 +166,7 @@ push_score  = impact × confidence        → eşik §2.2'den
 | **1** | `borsapy_src.py` (to_thread köprüsü, limiter) + 5 hisse fixture + **elle doğrulama** | THYAO/AKBNK TTM = KAP'taki rapor | 1-2 gün |
 | **2 (kritik)** | **6 aylık bildirim backfill deneyi** (§3) | 26 pencere çekildi VEYA fallback kararı | 0.5 gün |
 | **3** | `kap_firehose` + `disclosure`/`disclosure_ticker` + dedup + reaper | 24 saat kesintisiz, 0 duplike | 2-3 gün |
-| **4** | Fiyat geçmişi (XU100 + 50 hisse) + **event study** (§2) | Varyant tablosu dolu, karar verilmiş | 1-2 gün |
+| **4** | Fiyat geçmişi (XU100 + 50 hisse) + **event study** (§2) — *motor hazır ✅, veri bekliyor* | Varyant tablosu dolu, karar verilmiş | 1-2 gün |
 | **5** | Kural skor + Telegram + 18:15 özeti + emtia alarmı | Uçtan uca, LLM maliyeti 0 | 2-3 gün |
 | **6** | Web arayüzü (FastAPI, aynı DB) | Bildirim listesi + filtre | 2 gün |
 | **7** | LLM (Gemini / kendi wrapper) + replay + golden set | Şema valid %95, replay raporu | 3-5 gün |

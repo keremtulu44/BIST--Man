@@ -13,9 +13,11 @@ kural tabanlı skorlayan ve bildirim kanallarına dağıtan hat.
 | 2b | Unvan→kod eşleme + oran/ceza motoru | ✅ |
 | 1 | borsapy adaptörü + TTM elle doğrulama | ⏳ sırada (ağ gerekir) |
 | 2c | Postgres şeması + dedup + cursor | |
-| 3–5 | Event study, kural skor, Telegram | |
+| 3a | Event study motoru (CAR, z, t0 seçimi) + kalibrasyon ızgarası | ✅ |
+| 3b | Kural skor (`config/scoring.toml`) + Telegram | ⏳ sırada |
+| 4 | Gerçek veriyle kalibrasyon (KAP geçmişi + fiyat) | |
 
-`pytest`: **101 test**, ağ erişimi gerektirmez.
+`pytest`: **124 test**, ağ erişimi gerektirmez.
 
 ## Dokümanlar
 
@@ -42,12 +44,24 @@ src/bistman/
 │   └── text.py      # tr_lower / name_norm (İ/I tuzağı)
 ├── triage.py        # ÖDA/FR/DKB -> pipeline | fundamentals_refresh | routine | mechanical
 ├── features.py      # oranlar (ciro/PD/net kâr) + çarpımsal confidence cezaları
+├── analysis/
+│   ├── event_study.py   # t0 seçimi, CAR (endeks arındırılmış), z (oynaklık normalize)
+│   └── calibration.py   # eşik × günlük bütçe ızgarası -> isabet/kaçan tablosu
 ├── ticker_map.py    # unvan -> ticker (exact + fuzzy + belirsizlik reddi)
 ├── config.py        # config/universe.toml yükleyici
 └── sources/
     ├── base.py      # Protocol'ler + DisclosureStub/Detail/ParseResult
     └── kap.py       # firehose: list/light, detail, member_history + retry/backoff
 ```
+
+## Kalibrasyon demosu
+
+```bash
+.venv/bin/python scripts/kalibrasyon_tablosu.py   # sentetik veriyle tablo şekli
+```
+
+Gerçek veriyle aynı kod çalışır (Faz 4): KAP geçmişi + fiyat serisi -> `ScoredEvent`
+-> `sweep()`. Eşikler sezgiyle değil, "kaçan vs isabet" dengesinden seçilir.
 
 ## Tasarım kuralları (kısaca)
 
