@@ -243,6 +243,9 @@ async def build_scored_events(
 
     `body_provider` verilirse özette tutar bulunamayan adaylar için gövde
     çekilir — gerçek skorların tek kaynağı bu (geçmiş tablosunda tutar yok).
+
+    Gönderim burada yapılmaz: sonuç listesi `digest.rank`/`dispatch`'e verilir.
+    `notifier` yalnız test/replay içindir (geliş sırasıyla gönderir).
     """
     results: list[ProcessedDisclosure] = []
     for member_ticker, rows in rows_by_member.items():

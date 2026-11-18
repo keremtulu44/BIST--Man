@@ -82,7 +82,12 @@ async def process_batch(
     body_provider: BodyProvider | None = None,
 ) -> list[ProcessedDisclosure]:
     """Bir grup bildirimi uçtan uca işler. Hiçbir adım exception fırlatmaz;
-    her sonuç `status` + `notes` ile raporlanır."""
+    her sonuç `status` + `notes` ile raporlanır.
+
+    `notifier` verilirse push'lar **burada, geliş sırasıyla** gider. Üretimde
+    `notifier` verilmez: sıralama ve günlük bütçe `digest.dispatch` içinde
+    uygulanır (önem sırası + tek özet). Buradaki yol replay/test içindir.
+    """
     results: list[ProcessedDisclosure] = []
 
     for disclosure in disclosures:

@@ -26,6 +26,7 @@ kural tabanlı skorlayan ve bildirim kanallarına dağıtan hat.
 - **[docs/DOGRULAMA-ADIMLARI.md](docs/DOGRULAMA-ADIMLARI.md)** ← **senin yapacağın 2 doğrulama (PowerShell komutları)**
 - **[docs/HABER-DAVRANISI.md](docs/HABER-DAVRANISI.md)** — sistem bir habere ne yapıyor: 10 bulgu, kanıtlı
 - **[docs/ONEM-DENETIMI.md](docs/ONEM-DENETIMI.md)** — "önem" tek sayıda üç şeyi taşıyor: kanıtlı denetim
+- **[docs/SIRALAMA-VE-DIGEST.md](docs/SIRALAMA-VE-DIGEST.md)** — önem sırası, günlük bütçe, özet metni
 - **[docs/METIN-BILANCO-DENETIMI.md](docs/METIN-BILANCO-DENETIMI.md)** — metinleştirme sağlam; sıralama yok, bilançonun 1/6'sı kullanılıyor
 - **[docs/PLAN-V1.md](docs/PLAN-V1.md)** — v1 planı: evren, kalibrasyon yöntemi, fazlar
 - **[docs/MIMARI.md](docs/MIMARI.md)** — yazılım mimarisi, veri modeli, hata kataloğu
@@ -77,6 +78,7 @@ src/bistman/
 .venv/bin/python scripts/haber_davranisi.py      # haberlere nasıl davranıyor (bulgular)
 .venv/bin/python scripts/onem_denetimi.py        # önem/sıralama denetimi (6 deney)
 .venv/bin/python scripts/metin_ve_bilanco_denetimi.py  # metin · sıralama · bilanço kontrolü
+.venv/bin/python scripts/gunluk_ozet.py          # sıralama + günlük özet (push/özet metni)
 ```
 
 Gerçek veriyle aynı kod çalışır (Faz 4): KAP geçmişi + fiyat serisi -> `ScoredEvent`
