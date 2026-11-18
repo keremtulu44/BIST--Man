@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+.env
+
+# doğrulama çıktıları (yerel, commit edilmez)
+docs/dogrulama-cikti.txt
+
+# indirilen veri önbellekleri (fiyat serisi, bildirim gövdeleri)
+data/prices/
+data/bodies/
