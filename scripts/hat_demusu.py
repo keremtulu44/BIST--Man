@@ -78,7 +78,7 @@ def main() -> int:
     )
 
     for item in results:
-        action = item.decision.action if item.decision else "-"
+        action = item.planned_action or "-"
         score = f"{item.decision.push_score:5.2f}" if item.decision else "  -  "
         ticker = item.ticker or "  ?  "
         title = item.disclosure.title[:38]

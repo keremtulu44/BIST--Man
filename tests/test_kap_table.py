@@ -142,6 +142,18 @@ def test_parse_related_truncated_list() -> None:
     assert total == 8  # 2 gösterilen + 6 gizli
 
 
+def test_history_preserves_tickers_containing_digits() -> None:
+    table = (
+        '<table><tr><td><input id="1699030" type="checkbox"/></td><td>1</td>'
+        '<td>17.11.2026 14:53</td><td>A1CAP</td><td>X A.Ş.</td><td>ÖDA</td>'
+        '<td>Sözleşme</td><td></td><td>A1CAP, MTRKS (+6)</td><td></td><td></td><td>0</td>'
+        '</tr></table>'
+    )
+    [row] = parse_history(table)
+    assert row.tickers == ("A1CAP",)
+    assert row.related == ("A1CAP", "MTRKS") and row.related_total == 8
+
+
 def test_truncated_flag_on_row() -> None:
     row = HistoryRow(
         index=1,

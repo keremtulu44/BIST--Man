@@ -4,6 +4,7 @@ Ağ yok, DB yok, LLM yok. Ama hattın TAMAMI birlikte çalışıyor.
 """
 
 import asyncio
+from dataclasses import replace
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -168,6 +169,31 @@ def test_structured_ticker_bypasses_name_matching() -> None:
     assert item.features is not None and item.features.ratio_revenue is not None
 
 
+@pytest.mark.parametrize(
+    ("title", "tickers"),
+    [
+        ("TÜRK HAVA YOLLARI A.O.", ("THYAO", "AKBNK")),
+        ("TÜRK HAVA YOLLARI A.O. / THYAO, AKBNK", ()),
+    ],
+)
+def test_multi_symbol_disclosure_is_not_scored_for_an_arbitrary_company(title, tickers) -> None:
+    item = stub(50, title, "Yeni Sözleşme", summary="60 milyar TL", tickers=tickers)
+    [result], notifier = run([item])
+    assert result.status == "unresolved_ticker"
+    assert result.ticker is None and result.decision is None and notifier.count == 0
+
+
+def test_snapshot_quality_reaches_the_decision() -> None:
+    flagged = replace(FUNDAMENTALS["THYAO"], flags=("ttm_gap", "stale_fundamentals"))
+    [result], notifier = run([DISCLOSURES[0]], fundamentals={"THYAO": flagged})
+    assert result.features is not None and result.decision is not None
+    assert result.features.flags == flagged.flags
+    assert result.decision.confidence == pytest.approx(0.60 * 0.85)
+    assert result.decision.push_score == pytest.approx(4.59)
+    assert result.decision.action == "digest" and notifier.count == 0
+    assert any("ttm_gap" in reason for reason in result.decision.reasons)
+
+
 def test_missing_fundamentals_still_scores_but_flags() -> None:
     results, notifier = run(fundamentals={})
     item = next(r for r in results if r.disclosure.index == 10)
@@ -279,7 +305,7 @@ def test_body_provider_recovers_amount_from_detail() -> None:
     assert notifier.count == 1
 
 
-def test_body_provider_not_called_when_summary_has_amount() -> None:
+def test_body_provider_not_called_for_priced_noncontract_summary() -> None:
     called: list[int] = []
 
     async def body_provider(d: DisclosureStub) -> str | None:
@@ -288,7 +314,7 @@ def test_body_provider_not_called_when_summary_has_amount() -> None:
 
     asyncio.run(
         process_batch(
-            [DISCLOSURES[0]],  # özetinde 60 milyar TL var
+            [DISCLOSURES[6]],  # sözleşme değil, özette işlem bedeli var
             resolver=RESOLVER,
             fundamentals=FUNDAMENTALS,
             cfg=CFG,
@@ -392,3 +418,140 @@ def test_uncertain_push_is_labeled_in_message() -> None:
     message = render_message(item)
     assert "belirsiz" in message
     assert "implausible_ratio" in message
+
+
+@pytest.mark.parametrize(("notifier", "attempted", "ok"), [(None, 0, 0), (FakeNotifier(fail=True), 1, 0), (FakeNotifier(), 1, 1)])
+def test_push_candidate_is_not_a_delivery_receipt(notifier, attempted, ok) -> None:
+    rows = asyncio.run(process_batch([DISCLOSURES[0]], resolver=RESOLVER, cfg=CFG,
+                                     fundamentals=FUNDAMENTALS, notifier=notifier))
+    counts = summarize(rows)
+    assert counts["notified"] == ok and rows[0].is_notified == bool(ok)
+    assert counts["push_candidates"] == 1 and counts["push_attempted"] == attempted
+    assert counts["push_failed"] == attempted - ok
+
+
+def test_body_failure_is_local_and_auditable() -> None:
+    async def missing(d):
+        if d.index == DISCLOSURES[5].index:
+            raise RuntimeError("eksik detay")
+        return d.summary
+
+    rows = asyncio.run(process_batch([DISCLOSURES[5], DISCLOSURES[0]], resolver=RESOLVER, cfg=CFG,
+                                     fundamentals=FUNDAMENTALS, body_provider=missing))
+    assert rows[0].features.amount_try is None and any("gövde" in n for n in rows[0].notes)
+    assert rows[1].decision.action == "push"
+
+
+@pytest.mark.parametrize(("summary", "body", "expected", "flag", "fetch"), [
+    # Başka bir TL tutarı sırf kura gerek yok diye satış bedeli olamaz.
+    ("10 milyon EUR bedelli sözleşme", "Sermayemiz 60 milyar TL'dir.", None, "fx_fallback", False),
+    ("Eski bedel 100 milyon TL, yeni teklif 500 milyon TL.", "", None, "ambiguous_amount", False),
+    # Tek TL tutarı dahi tüm projeye ait olabilir: detaydaki açık şirket payını dene.
+    ("Ana projenin toplam bütçesi 80 milyar TL'dir.", "Şirketimize düşen pay 6 milyar TL'dir.", Decimal("6e9"), None, True),
+    ("Ana projenin toplam bütçesi 80 milyar TL'dir.", "", None, "unattributed_amount", True),
+    ("Ana projenin toplam bütçesi 80 milyar TL'dir.", "Geçen yılki ciromuz 7 milyar TL idi.", None, "unattributed_amount", True),
+    # Ayrı alanlar arasından sayı ve birimi birleştirme.
+    ("İşlem sırası 60", "milyar TL olarak raporlama yapılır.", None, "no_amount", True),
+])
+def test_amount_does_not_change_roles_across_fields(summary, body, expected, flag, fetch) -> None:
+    calls = []
+
+    async def provider(d):
+        calls.append(d.index)
+        return body
+
+    [r] = asyncio.run(process_batch([replace(DISCLOSURES[0], summary=summary)], resolver=RESOLVER,
+                                    cfg=CFG, fundamentals=FUNDAMENTALS, body_provider=provider))
+    assert r.features.amount_try == expected and bool(calls) == fetch
+    if flag:
+        assert flag in r.features.flags and r.features.primary_ratio is None
+
+
+@pytest.mark.parametrize("snapshot", [replace(FUNDAMENTALS["THYAO"], ticker="AKBNK"),
+                                      replace(FUNDAMENTALS["THYAO"], currency="USD"),
+                                      replace(FUNDAMENTALS["THYAO"], period_end="2026-12-31"),
+                                      replace(FUNDAMENTALS["THYAO"], revenue_ttm=float("nan"))])
+def test_incomparable_snapshot_cannot_create_a_push(snapshot) -> None:
+    [r], notifier = run([DISCLOSURES[0]], fundamentals={"THYAO": snapshot})
+    assert r.features.ratio_revenue is None and not r.is_notified and not notifier.count
+
+
+@pytest.mark.parametrize(("body", "flag", "action"), [
+    ("Ancak bu sözleşme bugün feshedildi.", "qualified_contract", "digest"),
+    ("Sözleşme bedeli 20 milyar TL'dir.", "ambiguous_amount", "silent"),
+    (None, "detail_unavailable", "silent"),
+])
+def test_priced_contract_checks_available_detail_before_pushing(body, flag, action) -> None:
+    async def provider(_):
+        return body
+
+    [r] = asyncio.run(process_batch([DISCLOSURES[0]], resolver=RESOLVER, cfg=CFG,
+                                    fundamentals=FUNDAMENTALS, body_provider=provider))
+    assert flag in r.features.flags and r.features.primary_ratio is None
+    assert r.planned_action == action
+
+
+@pytest.mark.parametrize("body", ["Geçen yılki ciromuz 100 milyar TL idi.",
+                                  "Başka bir şirket 60 milyar TL bedelli satış sözleşmesi imzalamıştır."])
+def test_signed_event_never_borrows_an_unattributed_body_price(body) -> None:
+    d = replace(DISCLOSURES[0], summary="Şirketimiz satış sözleşmesi imzalamıştır.")
+
+    async def provider(_):
+        return body
+
+    [r] = asyncio.run(process_batch([d], resolver=RESOLVER, cfg=CFG, fundamentals=FUNDAMENTALS,
+                                    body_provider=provider))
+    assert r.features.amount_try is None and r.planned_action == "digest"
+    assert "milyar" not in r.brief
+
+
+def test_unit_price_or_unknown_fx_is_not_an_event_total() -> None:
+    from bistman.features import amount_try_from_text
+    assert amount_try_from_text("Pay başına 2,35 TL temettü")[0] is None
+    for fx in ({"UNKNOWN": Decimal(40)}, {"EUR": Decimal(-1)}, {"EUR": Decimal("NaN")}):
+        assert amount_try_from_text("Bedel 10 milyon" if "UNKNOWN" in fx else "10 milyon EUR", fx)[0] is None
+
+
+def test_unconverted_signed_sale_keeps_its_currency_when_detail_has_other_financials() -> None:
+    d = replace(DISCLOSURES[0], summary="Şirketimiz 10 milyon EUR bedelli satış sözleşmesi imzalamıştır.")
+
+    async def provider(_):
+        return "Ödenmiş sermayemiz 60 milyar TL'dir."
+
+    [r] = asyncio.run(process_batch([d], resolver=RESOLVER, cfg=CFG, fundamentals=FUNDAMENTALS,
+                                    body_provider=provider))
+    assert r.features.amount_try is None and "fx_fallback" in r.features.flags
+    assert "10 milyon EUR" in r.brief and "60 milyar" not in r.brief
+
+
+def test_typed_body_must_belong_to_the_scored_company() -> None:
+    from bistman.sources.base import DisclosureDetail
+
+    d = replace(DISCLOSURES[0], summary=None)
+
+    async def provider(_):
+        return DisclosureDetail(replace(d, tickers=("AKBNK",)), "Sözleşme bedeli 90 milyar TL.", 0)
+
+    [r] = asyncio.run(process_batch([d], resolver=RESOLVER, cfg=CFG, fundamentals=FUNDAMENTALS,
+                                    body_provider=provider))
+    assert r.features.amount_try is None and "detail_mismatch" in r.features.flags
+
+
+def test_qualitative_agenda_does_not_send_an_instant_score_even_with_loose_threshold() -> None:
+    d = replace(DISCLOSURES[0], subject="Üretime Ara Verilmesi", summary="Geçen yıl ciromuz 60 milyar TL idi.")
+    notifier = FakeNotifier()
+    [r] = asyncio.run(process_batch([d], resolver=RESOLVER, cfg=replace(CFG, push_threshold=0),
+                                    fundamentals=FUNDAMENTALS, notifier=notifier))
+    assert r.decision.should_notify and r.planned_action == "digest"
+    assert r.features.primary_ratio is None and not r.is_notified and not notifier.count
+
+
+def test_failed_detail_does_not_erase_a_signed_summary_or_confirm_its_price() -> None:
+    d = replace(DISCLOSURES[0], summary="Şirketimiz 60 milyar TL bedelli satış sözleşmesi imzalamıştır.")
+
+    async def missing(_):
+        raise OSError("çevrimdışı")
+
+    [r] = asyncio.run(process_batch([d], resolver=RESOLVER, cfg=CFG, fundamentals=FUNDAMENTALS, body_provider=missing))
+    assert r.planned_action == "digest" and r.features.primary_ratio is None
+    assert "teyit edilmedi" in r.brief and "60 milyar" not in r.brief

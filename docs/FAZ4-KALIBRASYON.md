@@ -1,24 +1,23 @@
-# Faz 4 — Gerçek Kalibrasyon Nasıl Koşulur
+# Araştırma aracı: gönderim eşiklerinin kalibrasyonu (eski Faz 4)
 
-Bu dosya **senin makinende** (Windows, PowerShell) çalıştırılacak tek komutu ve
-çıktının nasıl okunacağını anlatır. Sandbox'ta ağ yok; bu yüzden canlı koşu
-sende, kod ve testler bende.
+> Bu komut eski skor ile sonraki fiyat hareketi arasındaki ilişkiyi araştırır. [Alarm bağlamı](ANA-MANTIK.md) için fiyat indirmek, eşik seçmek veya bu koşuyu yapmak gerekmez. Fiyatla eşleşme bir haberin hareketin nedeni olduğunu göstermez.
 
 ---
 
 ## Tek komut
 
 ```powershell
-python scripts\kalibrasyon_gercek.py --limit 5
+.\.venv\Scripts\python.exe scripts\kalibrasyon_gercek.py --limit 5
 ```
 
 - `--limit 5` = ilk 5 hisse. Önce küçük koşu: ne indirdiğini gör, sonra büyüt.
-- Küçük koşu ~30 saniye, tam koşu (47 hisse) birkaç dakika.
+- Süre; hisse sayısına, önbelleğe ve kaynağın yanıtına bağlıdır.
 - Sonuç iki dosyaya yazılır: `docs\kalibrasyon-sonuc.md` ve
   `config\scoring.measured.toml`.
 
-Kurulum yok, `pip install` yok: fiyat/KAP/İş Yatırım istemcilerinin hepsi
-standart kütüphane.
+Önce [README’deki kurulumu](../README.md#hızlı-başlangıç) yap: KAP istemcisi
+`httpx` kullanır. `--dry-run` ise ağ kullanmaz; raporu yalnız terminale yazar.
+Böylece bir demo, önceki gerçek ölçümlerin üzerine yazmaz.
 
 ## Ne indiriyor (maliyet)
 
@@ -26,21 +25,18 @@ standart kütüphane.
 |---|---|---|
 | KAP şirket listesi | 1 | `/tr/bist-sirketler` → `{kod: OID}` |
 | Üye geçmişi | 1 / hisse | 1 istek = 1 yıl |
-| Mali tablo | 2 / hisse | sanayi, tutmazsa banka şablonu |
-| **Bildirim gövdesi** | 1 / aday | **tutar yalnız burada** |
+| Mali tablo | 3 / şablon | 8 çeyrek + 4 yıl; gerekirse banka şablonu da denenir |
+| **Bildirim gövdesi** | Gereken aday başına 1 | Listede sonuç veya şirkete ait bedel eksikse detaya bakılır |
 | Fiyat | 1 / hisse + 1 | hisse = Yahoo, endeks = İş Yatırım |
 
-47 hisse için ~50 geçmiş + ~300 gövde + ~48 fiyat ≈ 400 istek. Gövdeler
-`data\bodies\`, fiyatlar `data\prices\` altında önbelleklenir; **ikinci koşu
-bedava**. (Bu iki klasör `.gitignore`'da, commit edilmez.)
+Örneğin boş önbellek, 47 hisse, hisse başına tek şablon ve 300 gövde için
+1 + 47 + 141 + 300 + 48 = 537 istek gerekir (yeniden denemeler hariç).
+Gövdeler `data\bodies\`, fiyatlar `data\prices\` altında önbelleklenir;
+yeniden koşuda geçmiş ve mali tablolar yine çekilir. İki önbellek de Git dışında.
 
-## En önemli gerçek
+## Tutar hakkında ölçülen şey
 
-**KAP geçmiş tablosunda tutar yok.** Tablo yalnız tarih, sınıf, unvan, konu,
-özet veriyor. Tutar bildirim gövdesinde. Bu yüzden:
-
-- `--no-bodies` ile koşarsan skorların neredeyse tamamı **0** çıkar.
-- Bu bir hata değil: eşiği ölçmek için tutar şart, tutar için gövde şart.
+İncelenen **89 satırlık MTRKS geçmiş tablosunun** başlık ve özetlerinden tutar çıkarılamadı. Bu örnekte yalnız tabloyla kurulan skorlar bu yüzden düşüktür. Genelde bir özette bedel olabilir; tersine, gövde gelmesi de şirketin kendi bedelinin saptandığı anlamına gelmez. Nitel bir açıklamayı grafik bağlamına almak için bedel gerekmez.
 
 Dry-run'ın (sentetik fiyat, 89 gerçek satır) çıktısı tam olarak bunu gösterdi:
 
@@ -70,9 +66,9 @@ hat 1 milyar TL'lik bir tutarı %31 ciro oranına çevirip skoru 2.4'ten 6'nın
 5. **Hesaplanamayan nedenleri** — `no_price_series`, `no_session_after_publish`,
    `no_volatility`… Bunlar örneklem kaybıdır, gizlenmez.
 
-## Geri gönderirken
+## Üretilen dosyalar
 
-İki dosyayı commit'le (gitignore'da **değiller**):
+Ağ kullanan araştırma koşusu şu iki dosyaya yazar; `--dry-run` yazmaz:
 
 ```
 docs/kalibrasyon-sonuc.md
@@ -81,9 +77,11 @@ config/scoring.measured.toml
 
 `data/prices/` ve `data/bodies/` **gönderme** (onlarca MB, önbellek).
 
-## Sonra ne olacak
+## Ölçümün sınırı
 
 1. Rapor okunur: eşik tablosu ayırt edici mi, kaçan maddi olay var mı.
-2. Seçilen eşikler `config/scoring.toml`'a **elle** taşınır; ölçüm dosyası kanıt
-   olarak kalır (sezgiyle ayar yapılan yer ile ölçümün yazıldığı yer ayrı).
-3. Ondan sonra Faz 2c (Postgres + dedup/cursor) ve Telegram dispatcher.
+2. **Tek güncel bilanço tüm geçmişe uygulanıyor.** Bu koşu veri kapsamını ölçmek
+   için kullanılabilir; geçmişteki karar isabetini kanıtlamaz. Haberin yayın
+   anında elde olan bilançolarla tekrar ölçmeden ve ayrı bir dönemde sınamadan
+   eşikleri `config/scoring.toml`'a taşımayın.
+3. Bu araştırma, alarm arşivinin hangi ana kadar tarandığını veya tek bir şirket olayının doğru etiketlendiğini ölçmez; bunların [ayrı kabul ölçütleri](ANA-MANTIK.md#açık-kontroller) vardır.

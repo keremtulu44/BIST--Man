@@ -1,214 +1,24 @@
-# VERİ KAYNAKLARI — ne nereden, hangi API ile
+# Veri kaynakları: hangi bilgi nereden gelir?
 
-> **GÜNCEL KARAR (bu dosyadan sonra verildi):** proje **kişisel/eğitim** amaçlı
-> olduğu için resmî/lisanslı katman gerekmiyor; veri erişimi `borsapy` üzerinden
-> yapılacak. Bu dosya **referans** olarak kalıyor: (a) borsapy'nin arkasındaki
-> gerçek kaynaklar bunlar, (b) gün gelir ürünleşirse hangi resmî yola geçileceği
-> burada yazılı. Aktif kararlar: **[VERI-KATMANI-BORSAPY.md](VERI-KATMANI-BORSAPY.md)**.
->
-> Soru: "Hazır API var mı?"
-> Kısa cevap: **Evet — 2025'ten beri MKK'nın resmî API Portalı var.** Ama tek
-> API her şeyi vermiyor; katman katman kurulacak. Bu dosyadaki her satır
-> ya resmî kaynaktan ya da **kurulu paketin kaynak kodu okunarak** doğrulandı.
-> Doğrulama yöntemi sütununda yazılı.
+[Ana mantık](ANA-MANTIK.md) için **olayın kaynağı KAP**, alarmın kaynağı ise **ana sistemin grafiğidir**. BIST-Man bu iki kaynağı birbirinin yerine kullanmaz. Hazırlıkta gereken veri aşağıdadır; alarm geldiğinde bu uçların hiçbiri çağrılmaz.
 
----
+| Girdi | Nereden / ne zaman? | Neye yeter, neye yetmez? |
+|---|---|---|
+| **Günün bildirim listesi** | `KapClient.light()` → `/tr/api/disclosure/list/light`. Demo aynı biçimdeki [kayıtlı listeyi](../tests/fixtures/kap/list_light_live.json) `parse_light` ile okur. | Bildirim no, yayın, unvan, konu, özet ile ön eleme yapılır. Bu kesitte yapısal hisse ve sınıf yoktur. Liste başlığı ihale sonucu, imza veya kesin bedel kanıtı değildir. |
+| **Bildirim detayı** | `KapClient.detail(index)` → `/tr/api/notification/attachment-detail/{index}`. Örnek: [1699030 detayı](../tests/fixtures/kap/detail_1699030_live.json). | Yapısal kod (`stockCode`, yoksa `relatedStocks`), sınıf ve Türkçe gövde ile aday doğrulanabilir. Başka no/zaman/şirketin gövdesi kullanılamaz. Alıntı ve kaynak bağı burada önemlidir; alarm isteğine tüm HTML veya ekler taşınmaz. |
+| **Şirket kimliği** | Yerel [unvan → hisse eşlemesi](../src/bistman/ticker_map.py); ayrıca [KAP şirket listesi istemcisi](../src/bistman/sources/kap_companies.py) geçmiş sorgusu için kod → üye OID sağlar. | Bu iki eşleme aynı şey değildir. OID bir üyeyi sorgulamak içindir; her satırın o şirketi anlattığını kanıtlamaz. Birden çok hisseye ait olayı rastgele birine bağlama. |
+| **Üye geçmişi** | `/tr/bildirim-sorgu-sonuc?member={oid}` → [kayıtlı MTRKS geçmiş tablosu](../tests/fixtures/kap/member_history_mtrks.html). | Yeniden oynatma ve kapsam denetimi için geçmiş satırları verir. Tablonun bugün indirilebilmesi, gövdenin geçmişte hangi saatte sisteme girdiğini göstermez. Tüm geçmiş, alarm cevabına eklenmez. |
+| **Mali ölçek** | Depoda [İş Yatırım `MaliTablo` istemcisi](../src/bistman/sources/isyatirim_client.py) ve [TTM hesabı](../src/bistman/analysis/ttm.py) var. Paketleyiciye, varsa, yayın zamanı ve kaynağı belirli `PublishedRow` sürümleri verilir. | İmzalı TL satış bedeli için aynı şirketin, **haber anına kadar yayımlanmış** karşılaştırılabilir sanayi cirosu kullanılabilir. Dönem sonu tek başına yayın zamanı değildir. Banka faiz gelirini sanayi cirosu gibi, kümülatif sütunları da bağımsız çeyrekler gibi kullanma. Kaynak veya güvenilir payda yoksa oran yok. |
+| **Alarm girdisi** | Ana sistem `hisse` ve saat dilimli `alarm_zamani` verir. | Tek yerel SQLite okuması içindir. Mum, fiyat, hacim, portföy, grafik görseli veya yorum API’si anahtarı gerekmez. |
 
-## 0. Özet karar
+## Hazırlıkta uygulanacak sınır
 
-| Katman | Birincil | Yedek | Neden |
-|---|---|---|---|
-| Bildirim akışı | **MKK API Portal** (resmî, ücretsiz, key'li) | KAP iç API (key'siz, kırılgan) | Resmî servis varken HTML/bot korumasıyla boğuşmak gereksiz |
-| Finansal tablo | **MKK KAP veri ürünü** (yapısal) | İş Yatırım `MaliTablo` | Otorite + kalem kodları (XI_29/UFRS) hazır |
-| Fiyat / PD / F/K | İş Yatırım `HisseTekil` (gün sonu) | Yahoo `.IS` | Ücretsiz, key yok |
-| Kur | TCMB `today.xml` (key yok) | TCMB EVDS | Kur bir kez/gün yeter |
-| Enflasyon (TMS-29) | TCMB EVDS | — | Ücretsiz key, resmî seri |
-| Şirket evreni | MKK `members` | KAP şirket listesi | Ticker + unvan + durum tek yerde |
+Canlı toplama bağlandığında liste **ortak** okunmalı; her hisse veya her alarm için aynı liste yeniden çekilmemeli. İlk elemeden geçen yeni/değişmiş aday için kimlik, sonuç veya kanıt eksikse ilgili no ile detay kontrol edilmeli. `KapClient` taşıma hatalarını, 429 ve 5xx yanıtlarını sınırlı sayıda tekrar dener; diğer HTTP hataları tekrar denenmez. Bozuk liste satırları [ayrıştırma sonucunda](../src/bistman/sources/base.py) görünür. Başarılı bir HTTP isteği, bütün adayların detayının incelendiği anlamına gelmez.
 
-**Kritik:** Hiçbiri "tamamı hazır, tek çağrıda bitecek" bir API değil. Ama
-hiçbiri için de "HTML kazıma + tarayıcı otomasyonu" yapmak zorunda değiliz.
-Bu, projeyi bir kademe kolaylaştıran gerçek.
+**Bugünkü yükleyici** [dört seçilmiş gerçek kaydı](../scripts/alarm_baglami.py) dosyalardan hazırlar. MTRKS örneği kodu zaten içeren detay kaydıyla başlar; kodu olmayan liste satırından o detayı otomatik keşfettiğini göstermez. Canlı tarama zamanlayıcısı, kaldığı yerden sürdürülen bir toplama imleci ve “şu ana kadar tarandı” kaydı yoktur. `kap_arsiv` / `sentetik` ayrımını yükleyici belirtir; URL’nin görünüşünden güven üretilmez. Varsayılan alarm sorgusu `kap_arsiv` okur. Yayın, ilk kullanılabilir an, düzeltme ve eksik veri riskleri [ana belgede](ANA-MANTIK.md) izlenir.
 
----
+## Bu sorgunun kaynağı olmayanlar
 
-## 1. MKK API Portal — resmî, ücretsiz, key'li
-
-**Ne:** Merkezi Kayıt Kuruluşu'nun (KAP'ı işleten kurum) API geçidi.
-13.01.2025'te açıldı. KAP veri yayın servisleri buraya entegre edildi ve
-**uygulama ücretsiz**.
-
-**Nasıl erişilir:**
-1. `https://apiportal.mkk.com.tr/` → hesap aç
-2. Hesap onaylanır
-3. Uygulama oluştur → **API Key** al
-4. Kullanmak istediğin API ürününe kayıt ol
-5. Test ortamı: `apigwdev.mkk.com.tr` · Üretim: `apigw.mkk.com.tr`
-
-**Servis yolları** (bir Python istemcisinin kodundan okundu — kendi
-kaydını yaptıktan sonra **ürün dokümanından teyit et**):
-
-```
-GET /api/vyk/disclosures            # bildirim listesi
-GET /api/vyk/lastDisclosureIndex    # son bildirim indeksi  ← cursor için altın
-GET /api/vyk/members                # şirket/üye evreni (ticker + unvan)
-GET /api/vyk/memberSecurities       # pay sayısı / kote bilgisi
-GET /api/vyk/blockedDisclosures     # erişime kapalı bildirimler
-GET /api/vyk/caEventStatus          # hak kullanım süreç durumu
-GET /api/vyk/funds                  # fon bildirimleri
-Auth: `Authorization: Basic <apiKey:apiSecret>` → sonra `Bearer <token>`
-Token: `/auth/generateToken?apiKey=...`
-```
-
-**Neden bu bizim için ideal:**
-- `lastDisclosureIndex` → **monoton cursor**. `MIMARI.md §2`'deki tasarımın
-  tam istediği şey. "Son gördüğüm set" derdi yok.
-- Bildirim listesi yapısal: `disclosureIndex`, `disclosureId`, `stockCode`,
-  `relatedStocks`, `publishDate`, `disclosureClass`, `summary`.
-  → **Ticker regex'i tamamen gereksiz**, KAP zaten `relatedStocks` veriyor.
-- Ekler (`attachments[]`) ve gövde (`disclosureBody[]`) ayrı alanlar.
-
-**Bilinmeyen / risk:**
-- **Rate limit ve kotayı bilmiyoruz** — kayıt sonrası ürün dokümanında yazar.
-  Tasarımı buna göre savunmacı yap: adaptif poll (15 sn) ilk günden fazla olabilir.
-- Onay süresi kişiden kişiye değişebilir. **Bu, geliştirmeyi bloklamamalı** (§5).
-- Kota ticari kullanımda değişebilir; ürün şartlarını kayıt sırasında oku.
-
-**Kaynak:** MKK duyurusu "MKK API Portal Yayında" (13.01.2025), MKK 2025
-faaliyet raporu, `apiportal.mkk.com.tr`. Servis yolları: PyPI `pykapfinance`
-0.1.1 `client.py` kaynak kodu.
-
-> ⚠️ O paketin içinde **gömülü bir varsayılan API key** var. Onu kullanma:
-> başkasının kotası, habersiz iptal edilebilir, ToS ihlali. Kendi key'ini al.
-
----
-
-## 2. KAP iç API — yedek plan (key'siz)
-
-Resmî API değil; KAP arayüzünün kendi çağırdığı uçlar. Kayıt/onay beklemeden
-**bugün** çalışır, bu yüzden geliştirme sırasında altın değerinde.
-
-```
-POST https://www.kap.org.tr/tr/api/disclosure/members/byCriteria
-     Content-Type: application/json
-     Referer: https://www.kap.org.tr/tr/bildirim-sorgu
-     User-Agent: <kendini tanıtan bir UA>            ← zorunlu, yoksa WAF yer
-GET  https://www.kap.org.tr/tr/api/disclosure/list/light      # günün tüm bildirimleri
-GET  https://www.kap.org.tr/tr/api/notification/attachment-detail/{disclosureIndex}
-GET  https://www.kap.org.tr/tr/Bildirim/{disclosureIndex}     # detay HTML
-```
-
-**Bilinen davranışlar (kaynak: `caganco/trailingedge` KAP endpoint notları + `MuhammedIsildak/kap-notifier`):**
-- Oturum ısıtma: önce `GET /tr/bildirim-sorgu` → çerez al, sonra API.
-- Cevaplarda **pagination token yok** → pencere dar tutulmalı; 2.000 sonuç
-  dönerse tarih aralığını böl.
-- 7 günlük pencerelerde 429 görülmemiş — ama bu "sınırsız" demek değil.
-- Tarih sorgusu bot korumasına düşebilir (**HTTP 666**).
-- `list/light` **sadece bugünü** döndürür → bir gün çalışmazsan o günün
-  bildirimleri **geriye dönük alınamaz**. Boşluk dedektörü şart (`MIMARI.md §2`).
-
-**Kullanım kararı:** Yedek + MKK onayı gelene kadar geliştirme ortamı.
-Üretimde MKK birincil; KAP yedeği **sadece** "MKK'da boşluk var" alarmı
-çalarsa devreye girer.
-
----
-
-## 3. Finansal tablolar
-
-### 3.a MKK / KAP finansal rapor bildirimleri (otoriter)
-
-Finansal tablolar KAP'a **bildirim** olarak düşer; gövde HTML tablo
-(`disclosureBody`), ekte PDF/XBRL. Yapısal kalem kodları (XI_29 sanayi,
-UFRS banka) buradan gelir. MKK ürünü varsa bu katman birincil.
-
-### 3.b İş Yatırım `MaliTablo` — hazır ve hızlı (doğrulandı)
-
-```
-GET https://www.isyatirim.com.tr/_layouts/15/IsYatirim.Website/Common/Data.aspx/MaliTablo
-  companyCode=THYAO
-  exchange=TRY
-  financialGroup=XI_29 | UFRS | UFRS_K
-  year1=2025 & period1=3 & year2=.. & period2=..
-```
-Doğrulama: `isyatirimhisse` 5.0.1 kaynak kodunda bu URL + parametreler birebir
-okundu. Aynı paket `HisseTekil` ile fiyat, `IndexHistoricalAll` ile endeks veriyor.
-
-**Kalem eşlemesi kritik:**
-| `financialGroup` | Kim için |
-|---|---|
-| `XI_29` | Sınai/ticari şirketler (varsayılan) |
-| `UFRS` | Bankalar |
-| `UFRS_K` | Konsolide olmayan / özel durumlar |
-
-Banka için `XI_29` çekersen alanlar boş/yanlış gelir → `MIMARI.md §2.4-d`.
-`period1` değerleri 3/6/9/12 = çeyrek sonları. TTM = son 4 çeyrek toplamı
-(**aynı dönem sonu bazında**).
-
-### 3.c `borsapy` — hazır ama lisansı ticari değil
-
-`borsapy` 0.11.0: `Ticker.balance_sheet`, `quarterly_income_stmt`,
-`ttm_income_stmt`, bankalar için `financial_group="UFRS"`, ayrıca `FX`,
-`Inflation`, `EVDS`, `replay`, `backtest` modülleri var. Kaynakları:
-İş Yatırım + KAP + TCMB + TradingView (fiyat).
-
-> **Lisans uyarısı (paketin kendi metni):** "yalnızca kişisel kullanım ve
-> eğitim amaçlıdır… ticari amaçla kullanılamaz. Ticari kullanım için Borsa
-> İstanbul ile iletişime geçin." Kişisel kullanımda sorun yok; ürünleştirirsen
-> bu katmanı lisanslı kaynakla değiştirmen gerekir. **Mimari sonucu:** veri
-> erişimini `Source` arayüzünün arkasında tut (zaten öyle), böylece lisans
-> gerektiğinde tek dosya değişir.
-
----
-
-## 4. Fiyat, kur, enflasyon
-
-| Veri | Kaynak | Erişim | Not |
-|---|---|---|---|
-| Gün sonu fiyat/PD | İş Yatırım `HisseTekil` | key yok | Günlük 1 istek/hisse yeter |
-| Gün sonu fiyat (resmî) | BIST **DataStore** | ücretli, dosya | EOD fiyat+hacim ~50 TL/ay; kurumsal sözleşme |
-| Fiyat (resmî, API) | BIST **VERDA** | kurumsal | Self-servis key yok |
-| Fiyat (3. taraf, lisanslı) | `api.istfin.com` | 399 TL/ay | REST + MCP; lisans iddiası doğrulanmalı |
-| Kur (bugün) | `tcmb.gov.tr/kurlar/today.xml` | key yok | Basit XML, günlük cache |
-| Kur + TÜFE (seri) | TCMB **EVDS** `evds3.tcmb.gov.tr` | ücretsiz key | `TP.DK.USD.A.YTL`, `TP.FG.J0` |
-| Enflasyon | TÜİK / EVDS | key | TMS-29 vintage kontrolü için |
-
-**F/K'yı satın alma, hesapla.** Sağlayıcılar "ana ortaklık payı mı, sürdürülen
-faaliyet mi" konusunda tutarsız. `PD / net_income_ttm(ana ortaklık)` en temizi.
-
----
-
-## 5. Bazı gerçekler ve mimari sonuçları
-
-1. **Resmî API var ama onay süreci var** → geliştirme MKK onayına bağlı
-   olmamalı. `DisclosureSource` arayüzü + 3 implementasyon:
-   `MkkApiSource` (üretim), `KapHtmlSource` (yedek/geliştirme), `FixtureSource` (test).
-   Aynısı finansallar için: `MkkFinancialsSource` / `IsyatirimSource` / `CsvSource`.
-2. **`relatedStocks` yapısal geliyor** → ticker regex'ine olan ihtiyaç kalkıyor.
-   Bu, `MIMARI.md §3.3`'teki 4 katmanlı çözümü 2 katmana indirir (fallback
-   sadece eski/yapısal olmayan metinler için kalır).
-3. **`lastDisclosureIndex` var** → `seen_ids` seti tasarımı tamamen çöpe.
-   Cursor + `ON CONFLICT DO NOTHING`.
-4. **KAP `list/light` geri doldurulamaz** → boşluk dedektörü opsiyonel değil.
-5. **Ücretsiz katmanların lisansı kişisel** → ürünleştirme kararı verilirse
-   veri katmanı BIST DataStore / VERDA / lisanslı sağlayıcıya taşınır. Kod
-   tarafında değişen tek şey `sources/` klasörü.
-
----
-
-## 6. Sıradaki somut adım (kod değil, 1 günlük erişim deneyi)
-
-Sırayla, her adımda **ham yanıtı `tests/fixtures/`'a kaydet** (fixture'lar
-hem test hem replay için):
-
-1. `apiportal.mkk.com.tr` → hesap aç, uygulama oluştur, key al, KAP ürününe
-   kaydol. Kota/limit sayfasını ekran görüntüsüyle `docs/` altına not et.
-2. KAP iç API'ye tek istek: `lastDisclosureIndex` benzeri bilgi geliyor mu,
-   gövde şeması ne? (`byCriteria`, 1 saatlik pencere)
-3. `isyatirimhisse` ile 5 hisse (THYAO, AKBNK, SISE, ASELS, +1 küçük) × 8
-   çeyrek çek; `XI_29` vs `UFRS` farkını gör.
-4. `tcmb.gov.tr/kurlar/today.xml` + EVDS serisi çek.
-5. Çıktı: `docs/VERI-ERISIM-RAPORU.md` — hangi alan geldi, hangi alan boş,
-   hangi endpoint kaç ms, hangi limit. **Karar D5 bu raporla verilir.**
-
-> Not: bu sandbox'ta dış ağ yalnız belirli hostlara açık olduğu için canlı
-> çağrılar burada denenemedi; yukarıdaki endpoint'ler paket kaynak kodu ve
-> yayınlanmış notlardan doğrulandı. Deneyi kendi makinende çalıştır.
+- **Fiyat/endeks serileri ve emtia:** Eski skor ve fiyat tepkisi deneylerine aittir. Grafik sinyali üretmek veya en son gelişmeyi seçmek için kullanılmaz.
+- **Kur:** Alarm paketini hazırlayan yolda tarihli kur kaynağı yoktur. EUR/USD bedelini özgün biriminde bırakmak, bugünün kuruyla geçmiş bir satışa TL oranı vermekten doğrudur.
+- **borsapy, MKK API Portal, TCMB/EVDS:** [Önceki kütüphane deneyi](VERI-KATMANI-BORSAPY.md) ve [kaynak seçenekleri araştırmasında](arsiv/KAYNAK-ARASTIRMASI.md) geçer. Alarm demosu için kurulum, abonelik veya anahtar şartı değildir. Desteklenen Python sürümü ve bağımlılıklar [pyproject.toml](../pyproject.toml) içindedir. Kamuya açık erişim yeniden dağıtım izni anlamına gelmez.

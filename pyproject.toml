@@ -7,12 +7,7 @@ name = "bistman"
 version = "0.1.0"
 description = "BIST 50 + emtia bildirim/skorlama hattı (kişisel kullanım)"
 requires-python = ">=3.11"
-dependencies = [
-    # Faz 1'de eklenecek (şu an hiçbir modül bunlara ihtiyaç duymuyor):
-    # "borsapy==0.11.0",     # TEK veri temas noktası — tam sürüm pinli (D12)
-    # "httpx>=0.27",         # firehose + dispatch
-    # "psycopg[binary]>=3.2" # Faz 2'de
-]
+dependencies = ["httpx>=0.27,<1"]  # KAP ve Telegram istemcileri
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]

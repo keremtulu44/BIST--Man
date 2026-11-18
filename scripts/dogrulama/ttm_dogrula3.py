@@ -91,8 +91,8 @@ def log(status: str, title: str, detail: str = "") -> None:
 # ------------------------------------------------------------------ HTTP
 
 
-def _open(url: str, insecure: bool = False, timeout: int = 30) -> bytes:
-    context = ssl._create_unverified_context() if insecure else ssl.create_default_context()
+def _open(url: str, timeout: int = 30) -> bytes:
+    context = ssl.create_default_context()
     request = urllib.request.Request(url, headers=HEADERS)
     with urllib.request.urlopen(request, timeout=timeout, context=context) as response:
         return response.read()
@@ -114,18 +114,7 @@ def fetch(symbol: str, group: str, periods: list[tuple[int, int]]) -> dict:
     except urllib.error.HTTPError as exc:
         raise RuntimeError(f"HTTP {exc.code} ({symbol})") from exc
     except urllib.error.URLError as exc:
-        reason = exc.reason
-        is_cert_error = isinstance(reason, ssl.SSLCertVerificationError) or "CERTIFICATE_VERIFY_FAILED" in str(reason).upper()
-        if is_cert_error:
-            # Kurumsal proxy / eski kök sertifika: burada doğrulamayı bırakmak kabul edilebilir,
-            # çünkü veri kamuya açık ve sadece okuma yapıyoruz. Yine de KAYIT altına alınır.
-            log("WARN", f"{symbol}: sertifika doğrulanamadı -> doğrulamasız tekrar", str(reason))
-            try:
-                raw = _open(url, insecure=True)
-            except Exception as exc2:
-                raise RuntimeError(f"doğrulamasız deneme de başarısız: {exc2}") from exc2
-        else:
-            raise RuntimeError(f"bağlantı hatası: {reason}") from exc
+        raise RuntimeError(f"bağlantı hatası: {exc.reason}") from exc
 
     text = raw.decode("utf-8", "replace").lstrip("\ufeff")
     if not text.strip().startswith(("{", "[")):

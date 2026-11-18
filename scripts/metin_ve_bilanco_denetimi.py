@@ -94,7 +94,7 @@ def section_text_to_number() -> None:
         print("    Tutar yalnız bildirim gövdesinde; ölçüm için gövde indirmek şart.")
 
     multi = sum(1 for row in rows if len(find_amounts(row.summary or "")) > 1)
-    print(f"\n  birden çok tutar içeren satır: {multi} (bu satırlarda 'en büyük' seçilir)")
+    print(f"\n  birden çok tutar içeren satır: {multi} (en büyük, ana bedel varsayılmaz)")
 
 
 def section_resolution() -> None:
@@ -222,9 +222,8 @@ def section_ordering(cfg: ScoringConfig) -> int:
         a.disclosure.index == b.disclosure.index for a, b in zip(results[: len(top)], top)
     )
     print(f"\n  iki sıralama aynı mı? {'EVET' if same else 'HAYIR'}")
-    print("  kod: process_batch sonuçları giriş sırasıyla döndürür; `sorted(` çağrısı")
-    print("  yalnız `analysis/calibration.py` (backtest) ve etiket eşlemede var.")
-    print("  `digest` bir **etiket**; onu toplayan/sıralayan/gönderen kod yok.")
+    print("  process_batch giriş sırasını korur. Kullanıcıya gidecek sıra ve günlük bütçe")
+    print("  digest.rank ile belirlenir; dispatch planı gönderir (yukarıdaki tablo ham skor).")
     return len(results)
 
 

@@ -87,6 +87,15 @@ def _tickers_from(raw: Any) -> tuple[str, ...]:
     return tuple(dict.fromkeys(codes))
 
 
+def _text(row: dict, key: str) -> str:
+    value = row.get(key)
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        raise ValueError(f"{key}: metin bekleniyordu")
+    return value.strip()
+
+
 def parse_light(raw: bytes | str) -> ParseResult:
     """`/api/disclosure/list/light` yanıtını `DisclosureStub` listesine çevirir."""
     try:
@@ -104,18 +113,18 @@ def parse_light(raw: bytes | str) -> ParseResult:
             continue
         try:
             index = int(row["disclosureIndex"])
-            subject = (row.get("subject") or "").strip()
+            subject = _text(row, "subject")
             if not subject:
                 raise ValueError("subject boş")
             items.append(
                 DisclosureStub(
                     index=index,
                     published_at=parse_kap_datetime(str(row["publishDate"])),
-                    title=(row.get("title") or "").strip(),
+                    title=_text(row, "title"),
                     subject=subject,
-                    summary=(row.get("summary") or None),
+                    summary=_text(row, "summary") or None,
                     # light ucunda sınıf/ticker YOK — bu yüzden .get() ile boş bırakıyoruz
-                    disclosure_class=row.get("disclosureClass") or None,
+                    disclosure_class=_text(row, "disclosureClass") or None,
                 )
             )
         except (KeyError, TypeError, ValueError, UnparsableDate) as exc:
@@ -147,8 +156,12 @@ def parse_detail(raw: bytes | str) -> DisclosureDetail:
     if not tickers:
         tickers = _tickers_from(basic.get("relatedStocks"))
 
-    body_parts = entry.get("disclosureBody") or []
-    body_html = "\n".join(str(p) for p in body_parts if p)
+    body_parts = entry.get("disclosureBody")
+    if body_parts is None:
+        body_parts = []
+    if not isinstance(body_parts, list) or not all(isinstance(p, str) for p in body_parts):
+        raise KapParseError("detail: disclosureBody metin dizisi değil")
+    body_html = "\n".join(p for p in body_parts if p)
 
     stub = DisclosureStub(
         index=index,
@@ -249,7 +262,10 @@ class KapClient:
             DETAIL_PATH.format(index=index),
             referer=f"{self._base}/tr/Bildirim/{index}",
         )
-        return parse_detail(response.content)
+        detail = parse_detail(response.content)
+        if detail.stub.index != index:
+            raise KapParseError(f"detail: istenen bildirim {index}, gelen {detail.stub.index}")
+        return detail
 
     async def member_history_raw(self, member_oid: str) -> str:
         """Üye bazlı geçmiş (varsayılan 1 yıl) — HAM HTML.

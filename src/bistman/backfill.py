@@ -241,8 +241,8 @@ async def build_scored_events(
 ) -> list[ProcessedDisclosure]:
     """Her üyenin geçmişini hattan geçirir (ağ yok; satırlar hazır).
 
-    `body_provider` verilirse özette tutar bulunamayan adaylar için gövde
-    çekilir — gerçek skorların tek kaynağı bu (geçmiş tablosunda tutar yok).
+    `body_provider` verilirse bedel çıkarımı/doğrulaması gerektiğinde adayın
+    gövdesi denenir (kayıtlı geçmiş tablosunda bedel yok).
 
     Gönderim burada yapılmaz: sonuç listesi `digest.rank`/`dispatch`'e verilir.
     `notifier` yalnız test/replay içindir (geliş sırasıyla gönderir).

@@ -1,16 +1,14 @@
-# BIST--Man — Yazılım Mimarisi (v0.1 taslak)
+# Arşiv: gönderim motorunun mimari taslağı (v0.1)
 
-> Kapsam: kod mimarisi, veri akışı, hata yönetimi. Ürün/pazarlama yok.
-> Bu doküman "ne yapacağız" değil **"kod arkada nasıl duracak"** sorusunun cevabı.
+> **Güncel mimari: [Ana mantık](ANA-MANTIK.md).** Buradaki beş modül, Postgres kuyruğu, LLM ve dispatcher, haber geldiğinde mesaj göndermeyi araştıran önceki tasarımdı. Alarm bağlamı bunları gerektirmez. Bölümler, eski koddaki `MIMARI.md §…` referansları için korunur; şemalar ve kabul hedefleri çalışan servis envanteri değildir.
 >
-> Derinlemesine kararlar (veri kaynağı seçimi, skor modeli, state machine,
-> replay, gözlemlenebilirlik): **[TASARIM-DETAY.md](TASARIM-DETAY.md)**
+> Güncel birleşme hedefi **tek dosya, tek uygulama, tek Render dağıtımıdır**: ana sistem `arsiv.alarm_baglami(hisse, alarm_zamani)` sonucunu kendi grafik yorum isteğine ekler. Aşağıdaki taslağın ayrıntıları ise [önceki karar kaydındadır](TASARIM-DETAY.md).
 
 ---
 
-## 0. Tek sayfa: 5 modülün gerçek hâli
+## 0. Önceki tasarımda beş modül
 
-Senin çizdiğin akış doğru. Ama üretimde ayakta kalan hâli şu:
+Gönderim motoru için o tarihte değerlendirilen yerleşim:
 
 ```
                   ┌──────────────────────────────────────────────┐

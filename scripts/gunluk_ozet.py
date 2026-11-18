@@ -2,8 +2,8 @@
 
 İki bölüm:
 
-  1. **Gerçek fixture** (89 MTRKS bildirimi): tutar olmadığı için gönderim yok.
-     Bunu göstermek kasıtlı — "sessizlik" bir hata değil, ölçümün sonucu.
+  1. **Gerçek fixture** (89 MTRKS bildirimi): fiyatlı push ve ölçeksiz gündem
+     ayrı sayılır; geçmişe gönderim yapılmaz.
   2. **Senaryo** (açıkça sentetik tutarlar): sıralama, hisse başına günlük bütçe
      ve Telegram'a gidecek **gerçek metinler**. Sayılar demo; mekanizma gerçek.
 

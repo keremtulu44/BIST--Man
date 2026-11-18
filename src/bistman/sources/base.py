@@ -98,6 +98,11 @@ class DisclosureDetail:
     attachment_count: int
     is_late: bool = False
 
+    def matches(self, expected: DisclosureStub, ticker: str | None) -> bool:
+        """Liste ve detayın aynı kayda ait olduğu ve yapısal hissenin çelişmediği sınır."""
+        return (self.stub.index == expected.index and self.stub.published_at == expected.published_at
+                and (not self.stub.tickers or set(self.stub.tickers) == {ticker}))
+
 
 @dataclass(frozen=True, slots=True)
 class ParseResult:

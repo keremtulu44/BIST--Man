@@ -1,4 +1,6 @@
-# Önem Denetimi — sistem "önem"e aynı anlamı mı veriyor?
+# Önem denetimi: önceki motorun skor deneyleri
+
+> Buradaki “önem”, bir gönderim puanının ne ölçtüğüdür. [Grafik alarmı bağlamında](ANA-MANTIK.md) öncelik sırası bu puanla kurulmaz. Aşağıdaki yön ve eşik önerileri yeni bir alarm üretme talimatı değildir.
 
 Sorulan: *önem gerçekten veriliyor mu, benzer haberler aynı mantığa mı düşüyor,
 alakasız şeyler de aynı sıraya mı giriyor?* Cevap ölçümle: `scripts/onem_denetimi.py`

@@ -14,8 +14,11 @@ FX notu: `to_try()` yalnızca verilen kur sözlüğüyle çevirir. Kur yoksa Non
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, DecimalException, InvalidOperation
+
+from .text import tr_lower
 
 # --- Sabitler ---------------------------------------------------------------
 
@@ -31,21 +34,30 @@ CURRENCY = {
     "usd": "USD", "dolar": "USD", "$": "USD", "abd doları": "USD",
     "eur": "EUR", "euro": "EUR", "€": "EUR", "avro": "EUR",
     "gbp": "GBP", "sterlin": "GBP", "£": "GBP",
+    "₤": "UNKNOWN",  # genel lira işareti, TRY varsayma
 }
 
 # Sıra KRİTİK: binlik-gruplu -> EN ondalık -> TR ondalık -> düz.
 # EN ondalık, "3.5 milyar"daki "3.5"i yakalayabilmek için düz sayıdan ÖNCE gelir;
 # aksi hâlde motor "3"ü eşleyip ".5 milyar"ı atlar ve tutarı 5 milyar okur.
 _NUM = r"(?:\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+\.\d{1,2}|\d+(?:,\d+)?)"
-_MAG = r"(?:bin|milyon|milyar|trilyon)"
-_CUR = (
-    r"(?:TL|TRY|₺|USD|EUR|GBP|₤|£|\$|dolar|euro|avro|sterlin|türk\s+lirası|abd\s+doları)"
-)
+_MAG = "(?:" + "|".join(MAGNITUDE) + ")"
+_CUR = "(?:" + "|".join(re.escape(k).replace(r"\ ", r"\s+") for k in CURRENCY) + ")"
 
-# (?<![\d.,]) -> bir sayının ORTASINDAN eşleşmeye başlamayı engeller
-# curpre -> "₺1.500.000", "$ 5 milyon" gibi ÖN EK para birimleri
+
+def _unit_key(token: str) -> str:
+    """Yalnız eşleşen birimi katla (MİLYON/MILYON); kaynak metne dokunma."""
+    return " ".join(tr_lower(token).replace("ı", "i").split())
+
+
+_CURRENCY_BY_KEY = {_unit_key(k): v for k, v in CURRENCY.items()}
+
+# Yüzdeleri aynı taramada tüket: metinden silmek hem ofsetleri kaydırır hem
+# de yüzde ifadesinin iki yanındaki bağımsız sayı ve para birimini birleştirir.
 MONEY_RE = re.compile(
-    rf"(?<![\d.,])(?P<curpre>{_CUR})?\s*(?P<num>{_NUM})\s*(?P<mag>{_MAG})?\s*(?P<cur>{_CUR})?\b",
+    rf"(?P<percent>(?:%\s*|\byüzde\s+){_NUM})|"
+    rf"(?<![\w.,])(?:(?P<curpre>{_CUR})\s*)?(?P<num>{_NUM})"
+    rf"(?:\s*(?P<mag>{_MAG}))?(?:\s*(?P<cur>{_CUR}))?(?!\w|[.,]\d)",
     re.IGNORECASE,
 )
 
@@ -57,8 +69,6 @@ _TR_DECIMAL = re.compile(r"\d+,\d+")
 _EN_DECIMAL = re.compile(r"\d+\.\d{1,2}")
 _PLAIN = re.compile(r"\d+")
 
-YEAR_MIN, YEAR_MAX = 1900, 2100
-
 
 @dataclass(frozen=True, slots=True)
 class Money:
@@ -69,14 +79,20 @@ class Money:
     end: int
     warnings: tuple[str, ...] = ()
 
-    def to_try(self, fx: dict[str, Decimal] | None = None) -> Decimal | None:
+    def to_try(self, fx: Mapping[str, Decimal] | None = None) -> Decimal | None:
         fx = fx or {}
         if self.currency == "TRY":
             return self.amount
         rate = fx.get(self.currency)
-        if rate is None:
+        if self.currency == "UNKNOWN" or rate is None:
             return None
-        return (self.amount * rate).quantize(Decimal("0.01"))
+        try:
+            rate = Decimal(str(rate))
+            if not rate.is_finite() or rate <= 0:
+                return None
+            return (self.amount * rate).quantize(Decimal("0.01"))
+        except DecimalException:
+            return None
 
 
 # --- Sayı normalizasyonu ----------------------------------------------------
@@ -109,19 +125,16 @@ def find_amounts(text: str) -> list[Money]:
     if not text:
         return []
 
-    # Yüzde ifadelerini maskele: "%12,5", "% 3", "yüzde 12"
-    masked = re.sub(r"%\s*\d+(?:[.,]\d+)?", " " * 0, text)
-    masked = re.sub(r"yüzde\s+\d+(?:[.,]\d+)?", "", masked, flags=re.IGNORECASE)
-
     out: list[Money] = []
 
-    for m in MONEY_RE.finditer(masked):
+    for m in MONEY_RE.finditer(text):
+        if m.group("percent"):
+            continue
         num_tok = m.group("num")
-        mag_tok = (m.group("mag") or "").lower()
-        # ön ek ya da son ek para birimi (₺1.500.000 | 1.500.000 TL)
-        cur_tok = ((m.group("cur") or m.group("curpre")) or "").lower()
+        mag_tok = _unit_key(m.group("mag") or "")
+        cur_tok = _unit_key(m.group("cur") or m.group("curpre") or "")
 
-        # Kural 1: ne büyüklük ne para birimi varsa -> tutar değil
+        # Ne büyüklük ne para birimi varsa -> tutar değil
         if not mag_tok and not cur_tok:
             continue
 
@@ -130,24 +143,12 @@ def find_amounts(text: str) -> list[Money]:
         except (ValueError, InvalidOperation):
             continue
 
-        # Kural 2: yıl sanısı (ör. "2024 milyon TL" gibi absürtlük yerine
-        # sadece tek başına 4 haneli yılları ele; büyüklük varsa dokunma)
-        if (
-            not mag_tok
-            and YEAR_MIN <= value <= YEAR_MAX
-            and value == int(value)
-            and "," not in num_tok
-            and "." not in num_tok
-        ):
-            continue
-
-        # Kural 3: büyüklük kelimesi uygula
         if mag_tok:
             value = value * MAGNITUDE[mag_tok]
 
-        currency = CURRENCY.get(cur_tok, "UNKNOWN")
+        currency = _CURRENCY_BY_KEY.get(cur_tok, "UNKNOWN")
 
-        # Kural 4: para birimi yok ama büyüklük var -> "15 milyar" (TL varsayımı
+        # Para birimi yok ama büyüklük var -> "15 milyar" (TL varsayımı
         # yapma, işaretle; FX kararı çağıran katmanın)
         warns_list = list(warns)
         if currency == "UNKNOWN":
@@ -157,7 +158,7 @@ def find_amounts(text: str) -> list[Money]:
             Money(
                 amount=value,
                 currency=currency,
-                raw=m.group(0).strip(),
+                raw=m.group(0),
                 start=m.start(),
                 end=m.end(),
                 warnings=tuple(warns_list),
@@ -167,8 +168,8 @@ def find_amounts(text: str) -> list[Money]:
     return out
 
 
-def best_amount(text: str, fx: dict[str, Decimal] | None = None) -> Money | None:
-    """TRY değeri en büyük tutarı seç (KAP metinlerinde ana tutar genelde en büyüktür)."""
+def best_amount(text: str, fx: Mapping[str, Decimal] | None = None) -> Money | None:
+    """Sayısal maksimum (inceleme aracı); olaya/şirkete ait bedeli belirlemez."""
     candidates = find_amounts(text)
     if not candidates:
         return None

@@ -1,11 +1,13 @@
-# Metinleştirme · Sıralama · Bilanço Kullanımı — Genel Kontrol
+# Ölçüm kaydı: metin, sıralama ve bilanço kullanımı
+
+> Bu inceleme eski gönderim hattında `digest.rank` eklenmeden önce yapıldı. Sonraki durum [sıralama ve digest](SIRALAMA-VE-DIGEST.md) belgesinde; güncel alarm yolu ise [Ana mantık](ANA-MANTIK.md) belgesindedir.
 
 Üç soru tek koşuda: `scripts\metin_ve_bilanco_denetimi.py` (ağ yok, 89 gerçek
 bildirim + 11 unvan + 8 para kalıbı + 6 bilanço senaryosu).
 
 **Özet:** Metinleştirme **sağlam** (Türkçe normalizasyon, sayı ayrıştırma doğru
-çalışıyor). Asıl eksik iki yerde: **sıralama canlı hatta hiç yok** (`digest`
-yalnız etiket, tüketicisi yok) ve **bilançonun 6 kaleminden 1'i** karara giriyor.
+çalışıyor). Ölçüm sırasında **gönderim sıralayıcısı henüz yoktu** (`digest`
+yalnız etiketti) ve **bilançonun 6 kaleminden 1'i** karara giriyor.
 
 ---
 
@@ -14,10 +16,10 @@ yalnız etiket, tüketicisi yok) ve **bilançonun 6 kaleminden 1'i** karara giri
 | Ölçüm | Sonuç |
 |---|---|
 | 89 gerçek bildirimde tutar bulunan satır | **0** |
-| Tutarın bulunduğu tek yer | bildirim **gövdesi** |
+| Bu örnekte tutar aramak için gereken ek kaynak | bildirim **gövdesi** |
 | Birden çok tutar içeren satır | 0 |
 
-Geçmiş tablosu tutar taşımıyor; ölçüm için gövde indirmek zorunlu (Faz 4
+Bu geçmiş kesitinde başlık ve özetten tutar çıkarılamadı; tutar ölçümü için gövde gerekli (Faz 4
 raporundaki "medyan skor 0.00" bulgusunun kökü bu).
 
 ### Para kalıpları
@@ -77,7 +79,7 @@ dönüyor.
 **Yapısal not:** triyaj ticker'dan **önce** çalışıyor → filtrelenen satırlar hiç
 ticker almıyor. "3+ devre kesici" sayımı yapılacaksa bu sıra değişmeli.
 
-## C · Sıralama: canlı hatta YOK
+## C · İlk incelemede sıralama eksikti
 
 Aynı 86 sonuç, iki farklı okuma:
 
@@ -98,7 +100,7 @@ Kod kanıtı:
   true. Digest'e düşen olayı **toplayan, sıralayan, gönderen kod yok**.
 - `max_push_per_ticker_per_day` ayarda var, uygulanmıyor (önceki denetim F8).
 
-Yani "verilerin önem sırasına göre sıralanması" bugün **hiç yapılmıyor**:
+Dolayısıyla bu deneyin yapıldığı sürümde **önem sıralaması yoktu**:
 gönderim sırası = KAP'ın yayın sırası; digest = hesaplanıp atılan sayı.
 
 ## D · Bilanço kullanımı: 6 kalemden 1'i karara giriyor
@@ -136,7 +138,7 @@ Kârlılık, özkaynak, aktif büyüklüğü, PD — dördü de toplanıyor ama 
 
 ---
 
-## Öncelik
+## Ölçüm tarihindeki öncelikler
 
 | # | Bulgu | Tür | Emek | Etki |
 |---|---|---|---|---|

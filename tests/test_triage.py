@@ -85,3 +85,9 @@ def test_spk_trading_ban_is_not_mechanical() -> None:
     """Gerçek veride görüldü: SPK işlem yasağı DKB sınıfında ama piyasa olayı."""
     assert route("DKB", "SPK İşlem Yasağı Nedeniyle Pay Duyurusu") is Route.PIPELINE
     assert route("DKB", "Kamuyu Aydınlatma Platformu Duyurusu") is Route.PIPELINE
+
+
+def test_light_financial_statement_is_a_refresh_not_a_money_bearing_event() -> None:
+    assert route(None, "Finansal Rapor") is Route.FUNDAMENTALS_REFRESH
+    assert route(None, "Finansal Rapor (Konsolide)") is Route.FUNDAMENTALS_REFRESH
+    assert route(None, "Finansal Raporlamaya İlişkin Açıklama") is Route.PIPELINE

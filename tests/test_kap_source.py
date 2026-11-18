@@ -234,3 +234,32 @@ def test_fetch_body_propagates_parse_error() -> None:
                 await kap.fetch_body(1)
 
     asyncio.run(run())
+
+
+def test_foreign_detail_never_reaches_body_or_cache() -> None:
+    async def run():
+        async with _client(lambda _: httpx.Response(200, content=DETAIL)) as kap:
+            with pytest.raises(KapParseError, match="1699030"):
+                await kap.fetch_body(12345)
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("field", ["subject", "summary", "title", "disclosureClass"])
+def test_light_rejects_one_nontext_field_without_poisoning_the_batch(field) -> None:
+    import json
+
+    rows = json.loads(LIGHT)[:2]
+    rows[0][field] = {"beklenmeyen": "şema"}
+    result = parse_light(json.dumps(rows))
+    assert len(result.items) == len(result.rejected) == 1
+    assert result.rejected[0][0] == 0 and field in result.rejected[0][1]
+
+
+def test_detail_body_schema_drift_is_not_joined_character_by_character() -> None:
+    import json
+
+    [entry] = json.loads(DETAIL)
+    entry["disclosureBody"] = "60 milyon TL"
+    with pytest.raises(KapParseError, match="disclosureBody"):
+        parse_detail(json.dumps([entry]))

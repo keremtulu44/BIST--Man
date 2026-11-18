@@ -1,11 +1,10 @@
-# Örnek Vakalar — haber + bilanço + karar + mesaj
+# Önceki gönderim motoru: 12 örnek vaka
 
-Bu dosya **çıktıdır, iddia değil**. `python scripts\ornek_vakalar.py` 12 gerçekçi
-KAP bildirimini, gerçek bilanço sayılarıyla hattan geçirir; tutarlar gerçek
-akıştaki gibi **gövdeden** gelir (özet metninde tutar yoktur).
+> Bunlar gönderim motorunun ilk sürümündeki senaryolardır, [hisse/zaman sorgusunun](ALARM-BAGLAMI.md) döndürdüğü gelişmeler değildir. Güncel tekrar için `python scripts/ornek_vakalar.py`: konkordato, tek-paya işlem yasağı ve kuru olmayan imzalı sözleşme artık özete girer. [Düzeltmeler ve gönderim onayı](GONDERIM-AKISI.md).
 
-Kullanılan bilançolar (`docs/GERCEK-VERI-RAPORU.md`'deki doğrulanmış değerler,
-2026/6 TTM):
+`python scripts\ornek_vakalar.py` **sentetik bildirimleri** kayıtlı (THYAO/AKBNK) ve varsayımsal (MTRKS) mali değerlerle işler. Bu senaryolarda tutarlar gövdededir. Aşağıdaki mesajlar eski örnek çıktılardır; gerçek Telegram teslimi değildir.
+
+Senaryolardaki mali girdiler (2026/6, [örnek scriptteki sabitler](../scripts/ornek_vakalar.py)). Kaynak karşılaştırması için [mali tablo ölçümüne](GERCEK-VERI-RAPORU.md) bak: örneğin senaryodaki THYAO net kâr sabiti o rapordaki net kâr ölçümüyle aynı değildir ve burada sözleşme oranının paydası değildir.
 
 | Hisse | Ciro / faiz geliri (TTM) | Net kâr (TTM) | Özkaynak | Not |
 |---|---|---|---|---|
@@ -29,7 +28,7 @@ hesaplanıyor ama kullanılmıyor (`METIN-BILANCO-DENETIMI.md` D).
  5 MTRKS  Bedelli Sermaye Artırımı                1,000 mn   %31.2    7.0    1.00  7.00  PUSH
  6 MTRKS  Vergi Cezası                              250 mn    %7.8    2.5    1.00  2.50  sessiz
  7 MTRKS  Konkordato Talebi                              —       —    0.0    0.45  0.00  sessiz
- 8 MTRKS  Finansal Rapor                                 —       —      —       —     —  bilanço yenileme
+ 8 MTRKS  Finansal Rapor                                 —       —      —       —     —  yenileme adayı
  9 MTRKS  Özel Durum Açıklaması (Genel)             800 mn   %25.0    6.5    1.00  6.50  PUSH
 10 MTRKS  Yeni Sözleşme İmzalanması                      —       —    2.5    0.70  1.75  sessiz
 11 MTRKS  Pay Bazında Devre Kesici Bildirimi             —       —      —       —     —  mekanik
@@ -83,11 +82,8 @@ sessizliğe gömülüyor**; önsel negatif olduğu için ceza, haberi "önemsiz"
 Tutar yok → impact = konu önseli; `konkordato` önsel listesinde **yok** → 0.
 Şirketin hayatını etkileyen haber, sistemin gözünde **hiçbir şey**.
 
-### 8 · MTRKS, "Finansal Rapor" → **bilanço yenileme**
-Sınıf `fr` → triyaj `fundamentals_refresh`: skorlanmaz, "veri tazelendi" sayılır.
-Doğru davranış: bilanço bildirimi haber değil, **paydanın güncellenmesi**.
-(Gövdedeki "net kâr 600 mn" tutarı skora girmez — bu yüzden bilanço güncellemesi
-ile haber skoru karışmıyor.)
+### 8 · MTRKS, "Finansal Rapor" → **yenileme adayı**
+Sınıf `fr` → `fundamentals_refresh`. Bu rota bildirimi **paydanın kontrolü için ayırır**; ne gövdedeki “net kâr 600 mn” bir haber skoru olur ne de etiket tek başına mali tablonun yenilendiğini kanıtlar.
 
 ### 9 · MTRKS, "Özel Durum Açıklaması (Genel)" + 800 mn sipariş → **PUSH** (6.50)
 Konu bilinmiyor (genel başlık), önsel 0. Karar **tamamen büyüklükten**: %25 →
@@ -107,7 +103,7 @@ konu önseli yok → impact 0 → sessiz. **Gerçek bilgi şoku, sıfır puan.**
 
 ---
 
-## Telegram'a giden mesajlar (birebir)
+## Sahte alıcıdaki ilk mesaj örnekleri
 
 Önce push'lar (önem sırasıyla), en sonda tek özet:
 

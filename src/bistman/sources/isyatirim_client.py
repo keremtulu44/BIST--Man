@@ -35,6 +35,7 @@ import ssl
 import urllib.error
 import urllib.parse
 import urllib.request
+import warnings
 from dataclasses import dataclass
 from datetime import date
 from typing import Any, Sequence
@@ -123,7 +124,7 @@ class IsYatirimClient:
         self,
         *,
         timeout: float = 30.0,
-        allow_insecure_ssl: bool = True,
+        allow_insecure_ssl: bool = False,
         fetcher: Any | None = None,
     ) -> None:
         self._timeout = timeout
@@ -145,8 +146,8 @@ class IsYatirimClient:
             )
             if not (cert_problem and self._allow_insecure):
                 raise IsYatirimError(f"bağlantı hatası: {exc.reason}") from exc
-            # Kurumsal proxy / eski kök sertifika: kamuya açık veriyi salt okunur
-            # çekiyoruz; doğrulamasız tekrar denenir ve bu durum çağırana bildirilir.
+            # Geriye uyumluluk: yalnız çağıran açıkça izin verdiyse.
+            warnings.warn("Mali tablo TLS doğrulaması olmadan alınıyor", RuntimeWarning, stacklevel=2)
             return self._read(url, ssl._create_unverified_context())
 
     def _read(self, url: str, context: ssl.SSLContext) -> bytes:

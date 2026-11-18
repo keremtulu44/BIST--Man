@@ -14,11 +14,12 @@ Toplamsal olsa "orta" derdi ve yanlış güven üretirdi.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Literal, Mapping
 
-from .parsing.money import best_amount
+from .parsing.evidence import event_amount
 
 StatementType = Literal["industrial", "bank"]
 
@@ -78,9 +79,10 @@ class Features:
 
 
 def _ratio(part: Decimal | None, whole: Decimal | None) -> float | None:
-    if part is None or whole is None or whole <= 0:
+    if part is None or whole is None or not part.is_finite() or not whole.is_finite() or whole <= 0:
         return None
-    return float(part / whole * 100)
+    ratio = float(part / whole * 100)
+    return ratio if math.isfinite(ratio) else None
 
 
 def build_features(
@@ -162,15 +164,7 @@ def amount_try_from_text(
     `fx_fallback`: tutar bulundu ama kur yok (ör. "500 milyon dolar" ve USD/TRY
     elimizde değil). Uydurma kur yok — bayrak + `None` döneriz.
     """
-    money = best_amount(text or "", fx)
-    if money is None:
-        return None, ("no_amount",)
-    if money.currency == "TRY":
-        return money.amount, ()
-    converted = money.to_try(fx)
-    if converted is None:
-        return None, ("fx_fallback",)
-    return converted, ()
+    return event_amount(text or "").as_try(fx)
 
 
 def ratio_bucket(ratio_pct: float | None) -> str:

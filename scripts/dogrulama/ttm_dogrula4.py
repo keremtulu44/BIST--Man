@@ -99,8 +99,8 @@ def log(status: str, title: str, detail: str = "") -> None:
 # ------------------------------------------------------------------ HTTP
 
 
-def _open(url: str, insecure: bool = False, timeout: int = 30) -> bytes:
-    context = ssl._create_unverified_context() if insecure else ssl.create_default_context()
+def _open(url: str, timeout: int = 30) -> bytes:
+    context = ssl.create_default_context()
     with urllib.request.urlopen(urllib.request.Request(url, headers=HEADERS),
                                 timeout=timeout, context=context) as response:
         return response.read()
@@ -117,11 +117,7 @@ def fetch_chunk(symbol: str, group: str, chunk: list[tuple[int, int]]) -> list[d
     except urllib.error.HTTPError as exc:
         raise RuntimeError(f"HTTP {exc.code}") from exc
     except urllib.error.URLError as exc:
-        if isinstance(exc.reason, ssl.SSLCertVerificationError) or "CERTIFICATE_VERIFY_FAILED" in str(exc.reason).upper():
-            log("WARN", f"{symbol}: sertifika doğrulanamadı -> doğrulamasız tekrar", str(exc.reason))
-            raw = _open(url, insecure=True)
-        else:
-            raise RuntimeError(f"bağlantı hatası: {exc.reason}") from exc
+        raise RuntimeError(f"bağlantı hatası: {exc.reason}") from exc
 
     text = raw.decode("utf-8", "replace").lstrip("\ufeff")
     if not text.strip().startswith("{"):

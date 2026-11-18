@@ -11,3 +11,9 @@ docs/dogrulama-cikti.txt
 # indirilen veri önbellekleri (fiyat serisi, bildirim gövdeleri)
 data/prices/
 data/bodies/
+
+# yerel alarm bağlamı arşivleri ve SQLite yan dosyaları
+*.sqlite
+*.sqlite-journal
+*.sqlite-shm
+*.sqlite-wal

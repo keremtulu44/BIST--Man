@@ -1,9 +1,8 @@
-# Durum Raporu
+# Arşiv: gönderim motorunun gelişim raporu (B1–B34)
 
 > Gerçek veriyle ölçülen sayılar ve etkileri: **[GERCEK-VERI-RAPORU.md](GERCEK-VERI-RAPORU.md)** — 2026-11-17
 
-> Kapsam: konuşmadan bugüne ne çıktı. Ölçülebilir durum, **ampirik bulgular**
-> (kod değil bilgi), tasarım kararları, açık riskler.
+> Bu sayfadaki test sayıları, “kilitlenen” kararlar ve sıralı işler skor/gönderim motorunun o tarihlerdeki durumunu kaydeder. Bugünkü ürünün amacı, uygulamada olanlar ve açık işler için **[Ana mantık](ANA-MANTIK.md)** esas alınır.
 
 ---
 
@@ -28,7 +27,7 @@ oturuyor.
 | Test | **270**, tamamı geçiyor, ağ erişimi yok |
 | Süre | ~0.24 s |
 | Gerçek KAP yanıtı fixture | 2 (`list_light_sample.json`, `detail_1699030.json`) |
-| Dış bağımlılık (runtime) | yok (yalnız `httpx`; `borsapy` Faz 1'de) |
+| Dış bağımlılık | KAP istemcisi `httpx` kullanır. borsapy araştırma konusuydu, proje bağımlılığı değildir. |
 
 Test dağılımı:
 
@@ -73,7 +72,7 @@ okumasıyla teyit edildi; projenin geri kalanını bunlar şekillendirdi.
 | **B22** | `DÖNEM KARI (ZARARI)` **bilanço** kalemi (dağıtılmamış kâr, stok); gelir tablosundaki net kâr `SÜRDÜRÜLEN FAALİYETLER DÖNEM KARI/ZARARI` | Aynı rapor + kalem kodu 2N5 vs 3J | Tablo filtresi olmadan stok kalem akış sanılır; iki kavram karışır |
 | **B23** | **Özkaynak/aktif STOK kalem**: TTM'i olmaz. "TTM özkaynak" 1.40 trilyon çıktı, doğrusu son bilanço 1.02 trilyon | Aynı rapor | `compute_ttm(kind="stock")` → son değer; akış varsayımı %37 hata |
 | **B24** | **AKBNK 2025Q3 özkaynak/aktif = 0** (258.9 → 0 → 310.2). Sıfır değer değil, veri boşluğu | Aynı rapor | 0'lar eksik sayılır + `data_gap` bayrağı; `tutar/0` felaketi önlendi |
-| **B25** | `MaliTablo` istemcisi **40 satır standart kütüphane** ile yazıldı: borsapy/pandas/numpy/httpx gerekmiyor | `isyatirim_client.py` + sahte taşıyıcı testleri | Kurulum sorunu kökten bitti; üretim yolu tek bağımlılıksız |
+| **B25** | `MaliTablo` istemcisi **40 satır standart kütüphane** ile yazıldı: borsapy/pandas/numpy/httpx gerekmiyor | `isyatirim_client.py` + sahte taşıyıcı testleri | Mali tablo istemcisi için ek paket gerekmedi; bu tüm proje için bağımlılıksızlık iddiası değildir. |
 | **B26** | Kalibrasyon hattı uçtan uca bağlandı, ama **gerçek veride skorlar sıfıra çöküyor** — çünkü geçmiş tablosunda **tutar yok** | `backfill.py` + `scripts/kalibrasyon_gercek.py` `--dry-run` | Eşiği ölçmek için gövde indirmek şart; 89 satırlık fixture'da medyan skor 0.00 |
 | **B27** | MTRKS sayfasındaki 'İŞ PORTFÖY … / IDH, IEV, …, MTRKS' satırının `Kod` sütunu **ISP** yazıyor: ihraççı fon, konu MTRKS. Eski atıf bu satırları MTRKS'ten siliyordu | `attribute_ticker` (üye kodu kazanır) + başlık sembol listesi | 3 satır MTRKS'e döndü; 3 fon-akışı satırı sayılarak dışlandı |
 | **B28** | Haber davranışı denetlendi: 23 pipeline satırının **19'u konu önseline uymuyor**; konkordato/yangın/işlem yasağı gibi tutarsız maddi haberler `impact 0` ile sessiz; döviz tutarları `fx_fallback` ile kör; günlük push bütçesi kodda uygulanmıyor | `scripts/haber_davranisi.py` + `docs/HABER-DAVRANISI.md` | 10 bulgu, 4'ü kod hatası, 2'si tasarım kararı bekliyor |
@@ -81,7 +80,7 @@ okumasıyla teyit edildi; projenin geri kalanını bunlar şekillendirdi.
 | **B30** | Metin/sıralama/bilanço denetlendi: normalizasyon **sağlam** (İ/I, hukuki ek, ASCII katlama); canlı hatta **sıralama yok** ve `digest` etiketinin tüketicisi yok; bilançonun 6 kaleminden **1'i** (ciro) karara giriyor, `statement_type` ölü, tazelik kontrolü yok | `scripts/metin_ve_bilanco_denetimi.py` + `docs/METIN-BILANCO-DENETIMI.md` | net kâr ×10/negatif → skor değişmiyor; PD hep None |
 | **B31** | Canlı akışta ticker yok: tek sembollü platform başlığı (`... / MTRKS`) artık çözülüyor; çok sembollü 5 satır (fon akışı, piyasa geneli) bilinçli olarak çözülmüyor | `parsing/text.symbols_in_title` + `pipeline._resolve_ticker` | 315 test |
 | **B32** | Sıralama + günlük özet yazıldı: `digest.rank` (skor ↓, deterministik), günlük push bütçesi (config'deki sayı **artık uygulanıyor**), aşan push özete iner (`bütçe` etiketli, kaybolmaz), özet düz metin + `max_items` + '… N olay daha' | `src/bistman/digest.py` + `tests/test_digest.py` (15) + `scripts/gunluk_ozet.py` | push'lar önem sırasıyla, özet en sonda; `process_batch(notifier=)` artık test yolu |
-| **B33** | 12 vakalık örnek kitap yazıldı (gerçek bilanço, tutar gövdeden): aynı haber THYAO'da özet / MTRKS'te push; %469 oran **etiketli** push; vergi cezası ve konkordato sessiz; döviz kör; FR bildirimi 'bilanço yenileme' | `scripts/ornek_vakalar.py` + `docs/ORNEK-VAKALAR.md` | Vaka 3 keşfedilen etkileşim hatası: `push_uncertain` skorla sıralanınca temettünün altına düşüyordu → artık impact ile sıralanıyor ve mesajda etiketli |
+| **B33** | 12 vakalık örnek kitap yazıldı (gerçek bilanço, tutar gövdeden): aynı haber THYAO'da özet / MTRKS'te push; %469 oran **etiketli** push; vergi cezası ve konkordato sessiz; döviz kör; FR bildirimi yenileme adayı | `scripts/ornek_vakalar.py` + `docs/ORNEK-VAKALAR.md` | Vaka 3 keşfedilen etkileşim hatası: `push_uncertain` skorla sıralanınca temettünün altına düşüyordu → artık impact ile sıralanıyor ve mesajda etiketli |
 | **B34** | LLM sınırı kuruldu (ağ yok, sağlayıcı enjekte): `SubjectReader` protokolü, `RuleSubjectReader` (bugünkü davranış, güven bilinçli 0.3), `LlmSubjectReader` (timeout + hata → kurala düş), katı JSON şeması (şema dışı alan → tüm yanıt reddedilir) | `src/bistman/llm.py` + `tests/test_llm.py` (18) + `docs/DURUM-VE-LLM-PLANI.md` | LLM yalnız konu/yön/önem sınıfı + ana tutar ifadesi önerir; oran/skor/eşik hep kodda |
 
 **B13 projenin en pahalı hatasını önledi:** doğrulama olmasaydı sistem "her haber
@@ -143,7 +142,7 @@ da mümkündür ve değerlidir (1 haftada öğrenilir, 6 ayda değil).
 
 ---
 
-## 6. Kilitlenen tasarım kararları
+## 6. Gönderim taslağındaki kararlar
 
 | # | Karar |
 |---|---|
@@ -177,7 +176,7 @@ Tam liste: `TASARIM-DETAY.md §1`.
 
 ---
 
-## 8. Sıradaki adımlar
+## 8. O tarihte planlanan adımlar
 
 | Sıra | İş | Kim |
 |---|---|---|

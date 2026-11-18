@@ -1,11 +1,13 @@
-# Sistem Bir Habere Ne Yapıyor?
+# Eski skor motoru bir habere ne yapıyordu?
+
+> **İlk denetim (F1–F10).** Aşağıdaki kusurlar ölçüm tarihine aittir. Sonraki bedel/gündem ve tekilleştirme değişiklikleri [gönderim karşılaştırmasında](GONDERIM-AKISI.md) açıklanır. Hisse bağlamında karar puana değil [kanıta ve zamana](ANA-MANTIK.md) bağlıdır.
 
 Bu dosya **iddia değil ölçüm**: her sayı `python scripts\haber_davranisi.py`
 çıktısından (89 gerçek KAP bildirimi + 15 temsili haber + 6 tuzak metin) geliyor.
 
 Özet cevap: **sistem haberi üç kapıdan geçiriyor, ama üç yerde "haber" sandığı
 şeyi veri olarak işliyor** — tutar yoksa, konu tanınmıyorsa ve dövizse haber
-görünmez oluyor. Bugünkü hâliyle sistem "büyük tutarlı, TL cinsinden, tanıdığı
+görünmez oluyordu. O aşamada motor "büyük tutarlı, TL cinsinden, tanıdığı
 konulu" haberleri yakalıyor; gerisini sessizce düşürüyor.
 
 ---
@@ -17,7 +19,7 @@ konulu" haberleri yakalıyor; gerisini sessizce düşürüyor.
 | Kapı | Satır | Ne oluyor |
 |---|---|---|
 | `pipeline` | 23 | tutar + oran + skor hesaplanır |
-| `fundamentals_refresh` | 13 | skorlanmaz, "veri yenilendi" sayılır (Finansal Rapor, Faaliyet Raporu, Sorumluluk Beyanı) |
+| `fundamentals_refresh` | 13 | Mali tablo kontrolü için ayrılır; bu etiket verinin yenilendiği anlamına gelmez. |
 | `mechanical` | 30 | kaydedilir, skorlanmaz — **29'u devre kesici** |
 | `routine` | 23 | kaydedilir, skorlanmaz (genel kurul, bilgi formu, tipe dönüşüm) |
 
@@ -139,14 +141,11 @@ okumak zorunda.
 
 ### F10 · Çok hisseli duyurular canlı yolda tek hisseye yazılıyor
 
-`_resolve_ticker` → `disclosure.tickers[0]`. MKK'nın 77 hisselik işlem yasağı
-duyurusu tek hisseye yazılır, diğer 76 hisse olayı görmez. Backfill tarafında
-bu turda düzeltildi (`select_rows` + `bulk_platform` sayımı), **canlı hatta
-hâlâ açık**.
+İlk sürüm `_resolve_ticker` içinde `disclosure.tickers[0]` alıyordu. Bu, 77 hisselik bir duyuruyu tek hisseye yazabiliyordu. Artık çoklu koddan ilkini seçmeme kuralı var. Daha önce tek hisseye atfedilmiş *eski bir sürümü* sonradan geri çekme sorunu ise ayrıdır; [açık kontroller](ANA-MANTIK.md#açık-kontroller).
 
 ---
 
-## Öncelik: hangisini önce düzeltmeli
+## İlk denetimdeki öncelik sırası
 
 | # | Bulgu | Tür | Emek | Etki |
 |---|---|---|---|---|

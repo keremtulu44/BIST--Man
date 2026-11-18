@@ -10,7 +10,7 @@ Ne yapıyor (sırayla):
   6. Hattan geçir: triaj -> oran -> skor (push_score)
   7. Fiyat: hisse (Yahoo) + XU100 (İş Yatırım) -> CAR(1), z(1)
   8. Eşik × bütçe ızgarası -> isabet / kaçan / push-per-gün
-  9. Rapor: docs/kalibrasyon-sonuc.md + config/scoring.measured.toml
+  9. Gerçek koşu: docs/kalibrasyon-sonuc.md + config/scoring.measured.toml. Dry-run yalnız ekrana yazar.
 
 Kullanım:
 
@@ -19,9 +19,9 @@ Kullanım:
     python scripts\\kalibrasyon_gercek.py --no-bodies          # gövde indirme (hızlı, skorlar düşük)
     python scripts\\kalibrasyon_gercek.py                      # tam koşu
 
-Maliyet: 1 istek/hisse (geçmiş) + 1 istek/aday (gövde) + 1 istek/hisse (fiyat).
-47 hisse için ~50 geçmiş + ~300 gövde + ~48 fiyat. Gövdeler `data/bodies/`
-altında önbelleklenir; ikinci koşu bedava.
+Hisse başına geçmiş ve fiyat dışında her mali tablo şablonu için 3 istek yapılır.
+Gövde yalnız adaylar için indirilir. Gövdeler ve fiyatlar önbelleklenir; istek
+hesabı ve gerçek koşunun sınırları için bkz. docs/FAZ4-KALIBRASYON.md.
 
 Gerçek veride **tutarlar özet metninde yok**: geçmiş tablosu yalnız konu/özet
 verir. Tutar gövdede. `--no-bodies` ile koşarsan skorlar ~0 çıkar; bu bir hata
@@ -253,6 +253,9 @@ def render_report(
         f"Üretim: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')} "
         f"· {'DRY-RUN (sentetik fiyat)' if dry_run else 'GERÇEK VERİ'}",
         "",
+        "> Hisse başına tek bilanço kullanılır. Eski haberler, o gün henüz yayımlanmamış",
+        "> bir bilançoyla oranlanmış olabilir. Bu tablo geçmiş performans kanıtı değildir.",
+        "",
         "## Kapsam",
         "",
         f"- Hisse: **{cov.members}** · KAP'ta bulunamayan: {len(absent)}",
@@ -330,7 +333,7 @@ def render_report(
         "",
         "1. Örneklemi büyüt (evrenin tamamı, 2 yıl).",
         "2. `kaçan` maddi olayları tek tek oku: kural mı kaçırdı, eşik mi yüksek?",
-        "3. Seçilen eşikleri `config/scoring.toml`'a **elle** taşı (bu dosya kanıt kalır).",
+        "3. Eşikleri ancak gerçek veride, haber anında yayımlanmış bilançolarla ve ayrı bir dönemde doğruladıktan sonra taşı.",
         "",
     ]
     return "\n".join(lines)
@@ -460,6 +463,16 @@ def run(*, dry_run: bool, limit: int | None, bodies: bool, max_bodies: int) -> i
     stats = score_stats(events, cfg)
     reports = sweep(events, thresholds=THRESHOLDS, max_per_day=BUDGETS)
 
+    report_text = render_report(
+        members=members, events=events, reasons=reasons, skips=skip_counts,
+        reports=reports, cov=cov, absent=absent, stats=stats,
+        bodies=body_state, dry_run=dry_run, cfg=cfg,
+    )
+    if dry_run:
+        print(report_text)
+        print("DRY-RUN: gerçek rapor ve ölçüm dosyalarına yazılmadı.")
+        return 0
+
     print("\n=== SKOR DAĞILIMI ===")
     if stats.get("n", 0):
         print(
@@ -472,14 +485,7 @@ def run(*, dry_run: bool, limit: int | None, bodies: bool, max_bodies: int) -> i
         print("  " + report.as_row())
 
     REPORT.parent.mkdir(parents=True, exist_ok=True)
-    REPORT.write_text(
-        render_report(
-            members=members, events=events, reasons=reasons, skips=skip_counts,
-            reports=reports, cov=cov, absent=absent, stats=stats,
-            bodies=body_state, dry_run=dry_run, cfg=cfg,
-        ),
-        encoding="utf-8",
-    )
+    REPORT.write_text(report_text, encoding="utf-8")
     write_measured(events, reports, cfg)
 
     print(f"\nRapor : {REPORT}")

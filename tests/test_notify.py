@@ -125,3 +125,47 @@ def test_telegram_transport_error_retries_then_fails() -> None:
 def test_empty_token_rejected_early() -> None:
     with pytest.raises(ValueError):
         TelegramNotifier(token="", chat_id=1)
+
+
+def test_chunks_preserve_long_line_including_final_qualification() -> None:
+    text = "Haber\r\n" + "Ş📌" * 4500 + " İPTAL.\nSon kayıt."
+    chunks = chunk_message(text)
+    assert "".join(chunks) == text
+    assert all(0 < len(part.encode("utf-16-le")) // 2 <= 4000 for part in chunks)
+
+
+@pytest.mark.parametrize("content", [b'{"ok":false}', b'{}', b'{"ok":"true"}', b'[]', b'<html>proxy</html>'])
+def test_telegram_requires_positive_api_ack_and_stops_on_failed_chunk(content) -> None:
+    attempts = []
+
+    def handler(request):
+        attempts.append(request)
+        return httpx.Response(200, json={"ok": True}) if len(attempts) == 1 else httpx.Response(200, content=content)
+
+    async def run():
+        notifier = _notifier(handler)
+        try:
+            assert not await notifier.send(("x" * 3999 + "\n") * 3, key="k")
+        finally:
+            await notifier.aclose()
+
+    asyncio.run(run())
+    assert len(attempts) == 2  # ilk parça gitmiş olabilir; kopuk üçüncü parça gitmesin
+
+
+def test_lost_response_after_post_is_not_reposted_blindly() -> None:
+    attempts = []
+
+    def handler(request):
+        attempts.append(request)
+        raise httpx.ReadTimeout("yanıt alınamadı", request=request)
+
+    async def run():
+        notifier = _notifier(handler)
+        try:
+            assert not await notifier.send("haber", key="k")
+        finally:
+            await notifier.aclose()
+
+    asyncio.run(run())
+    assert len(attempts) == 1

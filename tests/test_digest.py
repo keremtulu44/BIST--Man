@@ -217,3 +217,46 @@ def test_uncertain_ranks_by_impact_not_score() -> None:
     assert sort_metric(weird) > sort_metric(dividend)
     ranked = rank([dividend, weird])
     assert ranked.pushes[0] is weird
+
+
+def test_plan_is_not_a_receipt_and_failed_digest_is_not_absent() -> None:
+    rows = [item(7, "MTRKS", 1_000_000_000), item(8, "THYAO", 60_000_000)]
+    preview = render_digest(rank(rows), day=DAY)
+    assert "planlandı" in preview and "gönderildi" not in preview
+    report = asyncio.run(dispatch(rows, FakeNotifier(fail=True), day=DAY, cfg=CFG))
+    assert "0/1" in report.digest_text and "özet başarısız" in report.summary()
+
+
+def test_raising_notifier_cannot_swallow_the_next_push_or_digest() -> None:
+    keys = []
+
+    class Intermittent:
+        async def send(self, message, *, key):
+            keys.append(key)
+            if len(keys) == 1:
+                raise OSError("bağlantı yok")
+            return True
+
+    rows = [item(1, "MTRKS", 1_000_000_000), item(2, "MTRKS", 1_000_000_000), item(3, "THYAO", 60_000_000)]
+    report = asyncio.run(dispatch(rows, Intermittent(), day=DAY, cfg=CFG))
+    assert keys == ["1:MTRKS", "2:MTRKS", "digest:2026-11-17"]
+    assert (report.pushed_ok, report.pushed_failed, report.digest_sent) == (1, 1, True)
+    assert "1/2" in report.digest_text
+
+
+def test_each_budget_overflow_has_its_own_ordinal() -> None:
+    r = rank([item(i, "MTRKS", 1_000_000_000) for i in range(5)], budget_per_ticker=3)
+    assert [i.notes[-1].split()[2] for i in r.demoted] == ["4.", "5."]
+
+
+def test_dispatch_refuses_wrong_trt_day_and_previously_attempted_rows_before_io() -> None:
+    from dataclasses import replace
+
+    today = item(1, "MTRKS", 1_000_000_000)
+    tomorrow = item(2, "MTRKS", 1_000_000_000, hour=21)  # TRT 00:00
+    assert len(rank([today, tomorrow], budget_per_ticker=1).pushes) == 2
+    for bad in (tomorrow, replace(today, delivery="acknowledged"), replace(today, delivery="failed")):
+        notifier = FakeNotifier()
+        with pytest.raises(ValueError):
+            asyncio.run(dispatch([today, bad], notifier, day=DAY, cfg=CFG))
+        assert notifier.count == 0

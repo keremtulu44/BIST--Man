@@ -30,6 +30,14 @@ CLASS_FR = "fr"
 CLASS_DKB = "dkb"
 CLASS_DG = "dg"
 
+INDEX_SUBJECT = "Endekslerde Kullanılan Fiili Dolaşımdaki Pay Oranı Değişiklikleri"
+
+
+def is_index_agenda(title: str, subject: str, tickers: tuple[str, ...]) -> bool:
+    """BİST yayımladı diye her tek-pay duyurusunu piyasa gündemi yapma."""
+    return title == "BORSA İSTANBUL A.Ş." and subject == INDEX_SUBJECT and not tickers
+
+
 _CLASS_ALIASES = {
     "öda": CLASS_ODA,
     "oda": CLASS_ODA,
@@ -140,7 +148,7 @@ def route(
         return Route.FUNDAMENTALS_REFRESH
 
     if cls == CLASS_DKB:
-        if _contains_any(subject_n, _IMPORTANT_DKB_PATTERNS):
+        if subject == INDEX_SUBJECT or _contains_any(subject_n, _IMPORTANT_DKB_PATTERNS):
             return Route.PIPELINE
         if _contains_any(subject_n, _MECHANICAL_PATTERNS) or _contains_any(
             summary_n, _MECHANICAL_PATTERNS
@@ -156,6 +164,8 @@ def route(
     # Sınıf YOK: /api/disclosure/list/light bu alanı hiç vermiyor (canlı doğrulandı).
     # O yüzden konu/özet üzerinden mekanik ve rutin kalıpları yine de yakalarız;
     # hiçbir kalıba uymuyorsa fail-open (kaçırmak, gürültüden pahalı).
+    if subject_n.strip() in {"finansal rapor", "finansal rapor (konsolide)", "finansal rapor (konsolide olmayan)"}:
+        return Route.FUNDAMENTALS_REFRESH
     if _contains_any(subject_n, _IMPORTANT_DKB_PATTERNS):
         return Route.PIPELINE
     if _contains_any(subject_n, _MECHANICAL_PATTERNS) or _contains_any(

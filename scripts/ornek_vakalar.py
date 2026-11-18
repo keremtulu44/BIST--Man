@@ -123,13 +123,13 @@ CASES: tuple[Case, ...] = (
         "MTRKS", "Konkordato Talebi",
         "Şirketimiz konkordato talebinde bulunmuştur.",
         "Şirketimiz 18.11.2026 tarihinde konkordato talebinde bulunmuştur.",
-        "öda", "MADDİ ama TUTARSIZ haber ve SESSİZ: tanınmayan konu → impact 0",
+        "öda", "Tutar yok; dar şirket gündemi kuralıyla özete girer",
     ),
     Case(
         "MTRKS", "Finansal Rapor",
         "Şirketimizin 2026/9 dönemi finansal raporu ekte sunulmuştur.",
         "Dönem net kârı 600 milyon TL; satış gelirleri 3,2 milyar TL'dir.",
-        "fr", "Bilanço bildirimi: skorlanmaz, 'veri yenilendi' sayılır",
+        "fr", "Bilanço bildirimi: yenileme adayı; bu hat yenilemenin tamamlandığını söylemez",
     ),
     Case(
         "MTRKS", "Özel Durum Açıklaması (Genel)",
@@ -141,7 +141,7 @@ CASES: tuple[Case, ...] = (
         "MTRKS", "Yeni Sözleşme İmzalanması",
         "Şirketimiz yurt dışı müşteri ile sözleşme imzalamıştır.",
         "Sözleşme bedeli 500 milyon dolar olup 18 ayda teslim edilecektir.",
-        "öda", "DÖVİZ: kur tablosu yok → fx_fallback → tutar yok → sessiz",
+        "öda", "DÖVİZ: imzalı sözleşme özette, özgün bedel korunur; kur yoksa oran yok",
     ),
     Case(
         "MTRKS", "Pay Bazında Devre Kesici Bildirimi",
@@ -153,7 +153,7 @@ CASES: tuple[Case, ...] = (
         "MTRKS", "SPK İşlem Yasağı Nedeniyle Pay Duyurusu",
         "İşlem yasağı uygulanacaktır.",
         "SPK kararı gereği paylarda işlem yasağı uygulanacaktır.",
-        "dkb", "Piyasa geneli: gerçek bilgi şoku ama tutarsız → impact 0",
+        "dkb", "Yapısal kod tek payı gösteriyor; yasağın kapsamı genişletilmeden özete girer",
     ),
 )
 
@@ -201,21 +201,23 @@ def status_turkish(item: ProcessedDisclosure) -> str:
 
 
 def decision_turkish(item: ProcessedDisclosure) -> str:
-    if item.decision is None:
+    if item.planned_action is None:
         return "—"
     return {
         "push": "PUSH",
         "push_uncertain": "PUSH (belirsiz)",
         "digest": "özet",
         "silent": "sessiz",
-    }[item.decision.action]
+    }[item.planned_action]
 
 
 def reason_of(item: ProcessedDisclosure) -> str:
     """Tek satır gerekçe: hangi katman durdurdu / ne belirledi."""
+    if item.brief:
+        return item.brief
     if item.decision is None:
         return {
-            "fundamentals_refresh": "Mali tablo bildirimi: skorlanmaz, veri tazelenir",
+            "fundamentals_refresh": "Mali tablo bildirimi: skorlanmaz, yenileme için ayrılır",
             "filtered_mechanical": "Triyaj: mekanik (devre kesici vb.)",
             "filtered_routine": "Triyaj: rutin (form, genel kurul)",
             "filtered_fund": "Triyaj: fon/portföy bildirimi",
@@ -261,7 +263,7 @@ def main() -> int:
     )
 
     print(SEP)
-    print("ÖRNEK VAKALAR — 12 bildirim, gerçek bilanço, gövdeden gelen tutar")
+    print("ÖRNEK VAKALAR — 12 senaryo, gövdeden tutar (MTRKS cirosu varsayım)")
     print(SEP)
     print(f"  eşikler: push ≥ {cfg.push_threshold} · özet ≥ {cfg.digest_threshold}"
           f" · bütçe {cfg.max_push_per_ticker_per_day}/hisse/gün\n")
@@ -294,7 +296,7 @@ def main() -> int:
     report = asyncio.run(dispatch(results, notifier, day=DAY, cfg=cfg))
 
     print("\n" + SEP)
-    print("TELEGRAM'A GİDEN MESAJLAR")
+    print("SAHTE ALICIDA GÖRÜLEN MESAJLAR")
     print(SEP)
     print(f"  {report.summary()}\n")
     for key, message in notifier.sent:

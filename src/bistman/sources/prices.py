@@ -144,14 +144,6 @@ def _read(url: str, timeout: float) -> bytes:
     except urllib.error.HTTPError as exc:
         raise PriceError(f"HTTP {exc.code}: {url}") from exc
     except urllib.error.URLError as exc:
-        cert = isinstance(exc.reason, ssl.SSLCertVerificationError) or (
-            "CERTIFICATE_VERIFY_FAILED" in str(exc.reason).upper()
-        )
-        if cert:
-            with urllib.request.urlopen(
-                request, timeout=timeout, context=ssl._create_unverified_context()
-            ) as response:
-                return response.read()
         raise PriceError(f"bağlantı hatası: {exc.reason}") from exc
 
 

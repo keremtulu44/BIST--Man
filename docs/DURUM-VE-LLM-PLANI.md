@@ -1,4 +1,6 @@
-# Durum Değerlendirmesi ve LLM Planı
+# Arşiv: önceki skor motoru için LLM deneyi
+
+> Bu, skor/gönderim hattına model bağlama önerisiydi; alanlar ve iş sırası o aşamaya aittir. **[Güncel üründe](ANA-MANTIK.md)** KAP haberi bir LLM veya `force_notify` çağrısı başlatmaz. Ana sistem varsa bağlamı kendi mevcut yorum isteğine ekler.
 
 İki soru: **(1) sistem şu an nasıl?** (2) **normal bir AI API'si bağlanınca ne
 değişir, nereye bağlanmalı?**
@@ -9,14 +11,14 @@ değiştirmeden.
 
 ---
 
-## 1 · Şu an nerede
+## 1 · Deney başlarken durum
 
 ### Sağlam olan (kanıtlı)
 
 | Alan | Kanıt |
 |---|---|
 | Veri katmanı | TTM hatası bulundu ve düzeltildi (naif 1.99× şişme); tablo ayrımı, banka/sanayi şablonu, itemCode eşlemesi gerçek sayılarla doğrulandı |
-| Ağsız çalışma | 350 test, ağ/DB/anahtar yok; kurulum yok (stdlib istemciler) |
+| Ağsız çalışma | O sürümde 350 test; çalışma sırasında dış ağ, haricî DB veya anahtar gerekmedi. Kurulum bağımlılıkları ayrı. |
 | Metin | Türkçe normalizasyon (İ/I/ı, hukuki ek, ASCII katlama) ve TR/EN sayı ayrıştırma testli |
 | Triyaj | Gerçek 89 bildirimde gürültünün %74'ü skor görmeden düşüyor |
 | Hat | triyaj → tutar → oran → skor → sıralama → özet, uçtan uca ve deterministik |
@@ -28,7 +30,7 @@ değiştirmeden.
 | Eksik | Etkisi | Durum |
 |---|---|---|
 | **Gerçek veriyle kalibrasyon** | Eşikler hâlâ sezgi (6.5 / 3.5) | koşu sende: `kalibrasyon_gercek.py` |
-| **DB + daemon yok** | Sistem 7/24 çalışmıyor; bütçe bellekte, dedup yok | Faz 2c |
+| **Gönderim kayıt deposu + daemon yok** | Çağrılar arası bütçe/teslim durumu tutulmuyor; bu, sonraki yerel alarm arşivinden farklı bir ihtiyaç | Faz 2c |
 | **Telegram uçtan uca yok** | `TelegramNotifier` var, çalıştıran süreç yok | Faz 2c sonrası |
 | **`impact` üç şeyi taşıyor** | Aynı sayı farklı anlam; sıralama %100'de kırılıyor | `ONEM-DENETIMI.md` |
 | **Yön yok** | Kötü haber iyi haberle aynı ölçekte, sessizleşiyor | bu dosya §2 |
@@ -128,7 +130,7 @@ Kalibrasyon koşusu bunu zaten verecek:
 
 ---
 
-## 5 · Sıradaki iş sırası (öneri)
+## 5 · O deney için önerilen sıra
 
 | Sıra | İş | Neden şimdi |
 |---|---|---|

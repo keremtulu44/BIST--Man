@@ -32,6 +32,7 @@ from datetime import date, datetime, timedelta
 from typing import Iterable
 
 from .dates import UnparsableDate, parse_kap_datetime
+from .text import SYMBOL_RE
 
 __all__ = [
     "HistoryRow",
@@ -51,7 +52,6 @@ _RE_CELL = re.compile(r"<td[^>]*>.*?</td>", re.S)
 _RE_TAG = re.compile(r"<[^>]+>")
 _RE_CHECKBOX_ID = re.compile(r'id="(\d{6,})"\s+type="checkbox"')
 _RE_TRUNCATED = re.compile(r"\(\+(\d+)\)")
-_RE_TICKER = re.compile(r"^[A-Z]{3,6}$")
 _RE_DATETIME = re.compile(r"(\d{2})[./](\d{2})[./](\d{4})\s+(\d{2}):(\d{2})")
 _RE_RELATIVE = re.compile(r"(bugün|dün|bugun|dun)\s+(\d{1,2}):(\d{2})", re.I)
 _RE_TABLE = re.compile(r"<table[^>]*>", re.I)
@@ -190,11 +190,9 @@ def parse_related(cell: str) -> tuple[tuple[str, ...], int | None]:
     text = html_to_text(cell)
     if not text or text.strip() in {"-", "—"}:
         return (), None
-    total: int | None = None
+    tickers = tuple(SYMBOL_RE.findall(text))
     m = _RE_TRUNCATED.search(text)
-    if m:
-        total = len([t for t in text.split() if _RE_TICKER.match(t)]) + int(m.group(1))
-    tickers = tuple(t for t in re.split(r"[^A-Z]+", text) if _RE_TICKER.match(t))
+    total = len(tickers) + int(m.group(1)) if m else None
     return tickers, total
 
 
@@ -285,7 +283,7 @@ def parse_history(
             continue
         relation, total = parse_related(cells[8])
         issuer = cells[3].strip().upper()
-        tickers = (issuer,) if _RE_TICKER.match(issuer) else ()
+        tickers = (issuer,) if SYMBOL_RE.fullmatch(issuer) else ()
         period = cells[10].strip()
         attachment_raw = cells[11].strip()
         rows.append(

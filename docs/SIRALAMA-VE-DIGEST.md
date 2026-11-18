@@ -1,26 +1,24 @@
-# Sıralama ve Günlük Özet
+# Önceki gönderim motoru: sıralama ve günlük özet
 
-Denetim iki şeyi göstermişti: canlı hatta **sıralama yok** (gönderim = KAP'ın
-yayın sırası), `digest` bir **etiket** ve tüketicisi yok, `max_push_per_ticker_per_day`
-ayarda duruyor ama hiçbir kod uygulamıyor. Bu turda üçü de kapandı.
+> Bu mekanizma, bir **gruptaki** gönderim adaylarını sıralar. [Grafik alarmındaki tek gelişme](ANA-MANTIK.md) ise puanla değil hisse, yayın, bilinirlik ve kanıtla seçilir. Örneğin önceki satış özeti push, sonraki fesih bilgisi digest ise `rank` kanala öncelik verip eski satışı tutabilir. Bu yüzden alarm sorgusu `rank` kullanmaz.
 
 Modül: `src/bistman/digest.py` · demo: `python scripts\gunluk_ozet.py`
 
 ---
 
-## Kurallar (hepsi testli: `tests/test_digest.py`, 15 test)
+## Kurallar (`tests/test_digest.py`)
 
 | # | Kural | Neden |
 |---|---|---|
-| 1 | **Tekilleştirme**: aynı `(index, hisse)` iki kez gelirse en yüksek skorlu kalır, tekrar sayılır | KAP aynı bildirimi iki kez verebiliyor; sessiz eleme yok |
-| 2 | **Sıralama**: `push_score` ↓, eşitlikte `impact` ↓, hisse, yayın zamanı, index | Deterministik: aynı girdi aynı sıra |
-| 3 | **Bütçe**: hisse başına günde ≤ `max_push_per_ticker_per_day` push | Spam koruması; config'deki sayı artık gerçekten uygulanıyor |
+| 1 | **Tekilleştirme**: aynı `(index, hisse)` tek kayıt; gönderim kanalı, sonra o kanalın önem sırası belirleyici, tekrar sayılır | KAP aynı bildirimi iki kez verebiliyor; sessiz eleme yok |
+| 2 | **Sıralama**: `push_score` ↓ (`push_uncertain` için `impact`), eşitlikte `impact` ↓, hisse, yayın zamanı, index | Deterministik: aynı girdi aynı sıra |
+| 3 | **Bütçe**: tek gün için verilen grupta, hisse başına ≤ `max_push_per_ticker_per_day` push | Spam koruması; config'deki sayı artık gerçekten uygulanıyor |
 | 4 | Bütçeyi aşan push **düşürülmez**, özete iner ve `bütçe` etiketi alır | Kaybetmek yok, sadece sırası değişir |
-| 5 | **Özet**: digest olayları + bütçeden inenler, skora göre; `max_items` sonrası tek satırda sayılır | Tek mesaj, okunur uzunluk |
+| 5 | **Özet**: sayısal digest olayları + bütçeden inenler, ardından ölçeksiz gündem; `max_items` sonrası tek satırda sayılır | Tek mesaj, okunur uzunluk |
 | 6 | **Boş özet gönderilmez** (`None`), sayaçlar raporda | "Sessizlik = sinyal yok" değil, gönderilecek şey yok |
 
 Gönderim sırası **kasıtlı**: önce push'lar (en önemli önce), özet **en sonda**.
-Gün içinde tek tek bildirim, gün sonunda tek özet.
+Bu bir çağrının sırasıdır; gün sonu zamanlayıcısı henüz yok.
 
 ## Gerçek çıktı (senaryo: sentetik tutarlar, gerçek mekanizma)
 
@@ -36,11 +34,11 @@ MTRKS   5.50 Kapasite         │ özet  THYAO   4.50 Yeni Sözleşme
 MTRKS   9.00 Birleşme         │
 ```
 
-Telegram'a giden özet metni (düz metin, MarkdownV2 yok):
+Sahte alıcının onayladığı örnek özet (düz metin):
 
 ```
 GÜNLÜK ÖZET · 17.11.2026
-4 olay · 3 push ayrıca gönderildi
+4 olay · 3/3 ayrı push onaylandı
 
 1. MTRKS · Temettü Dağıtımı
    skor 7.50 · impact 7.5 · oran %15.6 · bütçe
@@ -64,29 +62,29 @@ ranked = rank(results, budget_per_ticker=cfg.max_push_per_ticker_per_day)
 text   = render_digest(ranked, day=date(2026, 11, 17))   # None olabilir
 
 report = await dispatch(results, notifier, day=date(2026, 11, 17), cfg=cfg)
-report.ok            # push'ların hepsi gitti ve özet (varsa) gitti mi
+report.ok            # denenen gönderimler alıcı tarafından onaylandı mı?
 report.summary()     # "push 3/3 · özet gönderildi · bütçe 1"
 report.ranked        # sıralama (sayaçlarla)
 ```
 
 `rank` **saf fonksiyondur**: DB, ağ, saat yok. `dispatch` yalnız `Notifier`'a
-dokunur. Böylece aynı kod replay'de (`FakeNotifier`) ve üretimde (`TelegramNotifier`)
-çalışır.
+dokunur. Örnekler `FakeNotifier` ile çalışır; bir Telegram istemcisinin bulunması, üretimde çalışan bir gönderim süreci olduğu anlamına gelmez.
 
 ## Sözleşme değişikliği: `notifier` artık test yolu
 
 `process_batch(notifier=...)` push'ları **geliş sırasıyla** gönderir — yani
-sıralamayı ve bütçeyi atlar. Üretimde `notifier=None` verilip sonuçlar
-`dispatch`'e geçmeli. İkisi de kod içinde yorumla işaretlendi.
+sıralamayı ve bütçeyi atlar. Gönderim deneyinde sıralı plan için `notifier=None` verilip sonuçlar `dispatch`'e geçirilir. Alarm bağlamında `dispatch` hiç çağrılmaz. Doğrudan denenmiş bir sonuç aynı listede `dispatch`'e verilirse ikinci kez gönderilmez; çağrı ağ erişiminden önce reddedilir.
+
+`rank`/`render_digest` yalnız plan bildirir. `dispatch` sonucu `pushed_ok`, `failed_push_keys`, `digest_sent` ve `digest_failed` ile onayı raporlar. `process_batch` doğrudan yolunda `summarize()["notified"]` yalnız olumlu alıcı yanıtlarını sayar; aday ve deneme ayrı sayaçlardır. [Ağsız hata deneyleri](GONDERIM-AKISI.md).
 
 ## Açık kalanlar (bilinçli)
 
 | Konu | Durum |
 |---|---|
-| **Gün sınırı** | `day` dışarıdan verilir; TRT takvim günü varsayılıyor (sabit UTC+3). Seans bazlı gün istersek `event_study._t0` kullanılmalı |
-| **Özet saati** | Yeni gün için tek sefer: 18:10 TRT (kapanış sonrası) öneriliyor; zamanlayıcı Faz 2c'de |
-| **Kalıcılık** | Bütçe sayacı bugün **bellekte**; süreç yeniden başlarsa sıfırlanır. DB geldiğinde (Faz 2c) `(gün, hisse)` sayacı kalıcı olacak |
-| **Tekrar gönderim** | `key` = `index:hisse`, özet için `digest:YYYY-MM-DD`; gerçek dedup DB'de (`ON CONFLICT DO NOTHING`) |
+| **Gün sınırı** | `day` dışarıdan verilir; `dispatch` başka TRT gününe (sabit UTC+3) ait kayıtları gönderimden önce reddeder. Seans bazlı gün istersek `event_study._t0` kullanılmalı |
+| **Özet saati** | Bu modül saati seçmez veya kurulu bir zamanlayıcı başlatmaz. |
+| **Kalıcılık** | Bütçe ve tekilleştirme yalnız **tek çağrıda** geçerli. Aynı süreçteki sonraki çağrıda da sıfırdan başlanır. Kalıcı `(gün, hisse)` sayacı yoktur. |
+| **Tekrar gönderim** | `key` = `index:hisse`, özet için `digest:YYYY-MM-DD`; bu anahtarlar çağrılar arası teslim kaydı değildir. |
 | **Sıralamanın kendisi** | Skor sıralaması, `impact`'in ne anlama geldiği kadar iyi (bkz. `ONEM-DENETIMI.md`). Sıralama mekaniği doğru; ölçek hâlâ kalibrasyon bekliyor |
 
 ## Tekrar üretmek

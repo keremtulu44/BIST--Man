@@ -54,6 +54,29 @@ def test_rejects_non_money(text: str) -> None:
     assert find_amounts(text) == []
 
 
+@pytest.mark.parametrize(
+    ("phrase", "amount", "currency"),
+    [
+        ("5 MİLYAR TÜRK LİRASI", "5000000000", "TRY"),
+        ("5 MILYON TL", "5000000", "TRY"),
+        ("3 BİN ABD\u00a0DOLARI", "3000", "USD"),
+        ("€3.500,50", "3500.50", "EUR"),
+        ("1,2 milyon €", "1200000", "EUR"),
+        ("250 $", "250", "USD"),
+        ("2000 TL", "2000", "TRY"),  # çıplak yıl değil: birim açık
+    ],
+)
+def test_amount_can_be_traced_to_original_text(phrase: str, amount: str, currency: str) -> None:
+    text = f"Payı %12,5 (yüzde 12,5); açıklanan tutar: {phrase}."
+    [money] = find_amounts(text)
+    assert money.amount == Decimal(amount) and money.currency == currency
+    assert text[money.start:money.end] == money.raw == phrase
+
+
+def test_percent_does_not_join_unrelated_number_and_currency() -> None:
+    assert find_amounts("10 %25 TL") == []
+
+
 def test_usd_converted_only_with_rate() -> None:
     money = best_amount("500 milyon dolar tutarında kredi", FX)
     assert money is not None

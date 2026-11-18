@@ -1,8 +1,9 @@
-# Gerçek Veri Raporu
+# Ölçüm kaydı: KAP ve mali tablolar (17 Kasım 2026)
+
+> Rakamlar aşağıdaki örneklemlere, faz ve test sayıları o günkü gönderim motoruna aittir. Bu bir canlı tarama veya grafik alarmı performans raporu değildir. [Güncel amaç ve kapsam](ANA-MANTIK.md).
 
 **Tarih:** 17.11.2026 · **Kaynak:** kullanıcının makinesinde alınan gerçek KAP ve
-İş Yatırım yanıtları · **Ağ gerekmez:** aşağıdaki tüm sayılar kayıtlı yanıtlardan
-yeniden üretilebilir.
+İş Yatırım yanıtları. Aşağıdaki komut başlıca karşılaştırmaları ağsız gösterir; bugünün KAP akışını indirmez.
 
 ```powershell
 python scripts\gercek_veri_ozeti.py     # bu dokümanın sayılarını basar
@@ -12,8 +13,7 @@ python scripts\gercek_veri_ozeti.py     # bu dokümanın sayılarını basar
 
 ## 1. Tek paragraf
 
-Sistem bugün **çalışan bir hat**: KAP akışından bildirim alıyor, %55'ini skorlamadan
-eliyor, kalanı eşleştirip orana çeviriyor, eşiği geçeni bildiriyor. Gerçek veriyle
+Kayıtlı 9 bildirimli örnekte 6 satır skorlanmadan ayrıldı. Bu bir günlük piyasa geneli eleme oranı değildir. Gerçek veriyle
 sınandığında **beş sessiz hata** çıktı ve beşi kapatıldı. En pahalısı: ciro paydası
 **2 katı** yanlıştı — sistem yanlış çalışmıyordu, *fazla sessiz* çalışıyordu.
 
@@ -79,22 +79,21 @@ KAP /list/light (17.11.2026, 15:34)
                               hepsi eşik altı → notified = 0
 ```
 
-**9 kaydın 6'sı skorlanmadan elendi.** Detay indirme (bildirim başına 1 istek)
-yalnızca 3 aday için yapılıyor. Gerçek yıllık dağılım da aynı yönde: MTRKS'in 89
-bildirimi = 39 DKB + 27 ÖDA + 13 FR + 10 DG; **DKB+DG = %55 bilgi taşımıyor**.
+**9 kaydın 6’sı skorlanmadan elendi.** Detay gerekirse adayın bildirim numarasıyla istenir; bu tekrar oynatım bir canlı istek sayımı değildir. Gerçek yıllık dağılım da aynı yönde: MTRKS'in 89
+bildirimi = 39 DKB + 27 ÖDA + 13 FR + 10 DG; DKB + DG yaklaşık %55’tir. Sınıf dağılımı tek başına “bilgi taşımıyor” demek değildir; konu istisnaları vardır.
 
 Eşiği geçen olmaması hata değil: BIST 50'de rastgele bir salı gününde tetikleyici
 haber olmaması normal. "Her gün 3 bildirim" bir hedef değil, üst sınır.
 
 ---
 
-## 5. Hat bugün nasıl çalışıyor (dosya dosya)
+## 5. O aşamadaki gönderim hattı (dosya dosya)
 
 ```
 KAP firehose ──► triage.route() ──► ticker_map ──► isyatirim_client ──► features ──► scoring ──► notify
  (sources/kap)   (sınıf+konu)     (unvan→kod)     (4 dönem/istek)      (3 oran)    (kural)   (Telegram)
                        │               │                  │
-                  %55 elenir      unmatched kuyruğu    TTM düzeltmesi
+                  ön eleme        eşleşme durumu       TTM düzeltmesi
 ```
 
 | Dosya | Sorumluluk | Gerçek veriyle sınandı |
@@ -125,7 +124,7 @@ KAP firehose ──► triage.route() ──► ticker_map ──► isyatirim_c
 
 ---
 
-## 7. Bugünkü durum
+## 7. Ölçüm tarihindeki durum
 
 ```
 ✅ Faz 0-3b   ayrıştırma → triaj → oran → skor → uçtan uca hat → Telegram istemcisi
@@ -136,7 +135,6 @@ KAP firehose ──► triage.route() ──► ticker_map ──► isyatirim_c
 ⏳ Faz 6-7    web arayüzü, LLM (v1'de yok)
 ```
 
-**Test:** 270, tamamı ağsız geçiyor. **Bağımlılık:** sıfır (pandas/httpx/borsapy yok).
+Rapor yazıldığında 270 test vardı. Bugünkü kurulum için [README](../README.md#hızlı-başlangıç) geçerlidir; İş Yatırım istemcisi standart kütüphaneyi, KAP istemcisi `httpx` kullanır.
 
-Sıradaki iş, bu raporun 6. bölümündeki boşlukları doldurmak: 50 hisse için KAP
-geçmişi + fiyat → her bildirim için CAR → eşik × bütçe tablosu → `scoring.toml`.
+O aşamada planlanan sonraki deney, geçmiş KAP satırlarını fiyatla eşleştirip CAR ile eşik/bütçe tablosu oluşturmaktı. Bu, hisse ve alarm zamanı ile bağlam sorgulamanın önkoşulu değildir.

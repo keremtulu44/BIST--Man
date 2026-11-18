@@ -1,9 +1,6 @@
-# PLAN v1 — BIST 50 + endeks + emtia, kural tabanlı, veriyle kalibre
+# Arşiv: ilk gönderim planı — BIST 50, endeks ve emtia
 
-> Cevaplara göre: evren **BIST 50** (+ XU100/XBANK seviyesi) + **altın/gümüş/petrol**;
-> eşikler **6 aylık toplu veriyle** belirlenecek; **LLM yok** (Faz 3'te Gemini
-> veya kendi wrapper); kanal **Telegram → sonra web**; hedef **ileride ürüne
-> dönüşebilir** (mimari hazır, kod tek-kullanıcı).
+> Bu plan BIST 50/emtia izleme, fiyat tepkisine göre kalibrasyon ve Telegram gönderimi içindi. Aşağıdaki fazlar ve zamanlamalar o planın kaydıdır; alarm bağlamının yol haritası değildir. **Bugünkü amaç: [Grafik alarmının yanına KAP bağlamı](ANA-MANTIK.md).**
 
 ---
 
@@ -59,8 +56,7 @@ z(k)   = CAR(k) / (σ_günlük × √(k+1))          σ = hissenin son 60 günl�
 
 **Uyarı (dürüst olalım):** bu etiket "önem" değil **"piyasa etkisi"** ölçer.
 Haber zaten fiyatlanmış olabilir; bazı büyük haberler fiyata yansımaz.
-Bizim ürünümüz "erken uyarı" olduğu için doğru etiket yine de bu — ama
-sonuçları yorumlarken bunu bilelim.
+“Erken uyarı” hedefli bu deneyde o etiket seçilmişti. Grafik alarmına dönen şirket bilgisinin doğru hisseye, zamana ve kanıta dayanıp dayanmadığını bu etiket ölçmez.
 
 ### 2.2 Karar kriteri: "günlük bütçede isabet oranı"
 
@@ -176,7 +172,7 @@ push_score  = impact × confidence        → eşik §2.2'den
 
 ---
 
-## 6.5 Kesinleşen v1 kararları
+## 6.5 İlk gönderim planında seçilen politikalar
 
 | Konu | Karar | Gerekçe |
 |---|---|---|

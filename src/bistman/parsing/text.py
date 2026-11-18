@@ -47,8 +47,8 @@ _ASCII_FOLD = str.maketrans(
 )
 _SPACES = re.compile(r"\s+")
 
-# BIST sembolü: 3-5 karakter, harfle başlar, rakam içerebilir (A1CAP, A1YEN).
-SYMBOL_RE = re.compile(r"\b[A-Z][A-Z0-9]{2,4}\b")
+# KAP sembolü: 3-6 karakter, harfle başlar, rakam içerebilir (A1CAP, A1YEN).
+SYMBOL_RE = re.compile(r"\b[A-Z][A-Z0-9]{2,5}\b")
 # KAP çok hisseli bildirimlerde semboller başlığın " / " sonrasında sıralanır:
 #   "BORSA İSTANBUL BISTECH ... Bildirimi / MTRKS"
 #   "BORSA İSTANBUL A.Ş. Hak Kullanımı / KRGYO, MTRKS"

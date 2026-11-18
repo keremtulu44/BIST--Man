@@ -1,14 +1,12 @@
-# TASARIM-DETAY — Karar verdirici ayrıntılar
+# Arşiv: gönderim motorunun tasarım kararları
 
-> Bu dosya `MIMARI.md`'nin devamı. Orada "nasıl durur" yazdı, burada **"hangi
-> seçeneği neden seçiyoruz"** var. Her bölüm sonunda karar ve gerekçesi.
-> Kural: buradaki bir karar değişirse, kod değil **önce bu dosya** değişir.
+> [Mimari v0.1 taslağının](MIMARI.md) tarihsel karar kaydıdır. Tablodaki durumlar o taslağa aittir. Özellikle borsapy, yönetilen Postgres, emtia alarmı, Telegram ve gönderim saatleri güncel ürün gereksinimi değildir. Bugünkü kararlar [Ana mantık](ANA-MANTIK.md), kullanılan kaynaklar [Veri kaynakları](VERI-KAYNAKLARI.md) belgesindedir.
 
 ---
 
-## 1. Açık karar kaydı (decision log)
+## 1. Önceki taslakta alınan kararlar
 
-| # | Karar | Seçim | Durum |
+| # | Karar | O taslaktaki seçim | O tarihteki durum |
 |---|---|---|---|
 | D1 | Dil/stack | Python 3.12, asyncio, httpx, pydantic v2 | ✅ kesin |
 | D12 | Veri kütüphanesi | `borsapy==0.11.0` pinli, tek dosyada izole | ✅ kesin |
@@ -413,7 +411,7 @@ kapatılamayan tek delik.
 
 ---
 
-## 8. Senin karar vermen gereken 5 soru
+## 8. Önceki tasarımın beş açık sorusu
 
 Cevaplar bu dosyayı ve kodu şekillendirir. Benim önerim parantezde.
 

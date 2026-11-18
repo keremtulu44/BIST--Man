@@ -1,0 +1,155 @@
+"""Paketin kanıt ve zaman sınırları; AI'nın veya fiyat yönünün testi değil."""
+
+import asyncio
+from dataclasses import replace
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+import pytest
+
+from bistman.context_packet import MAX_CHARS, PacketHeld, PublishedRow, build_packet, compact_json
+from bistman.digest import dispatch
+from bistman.notify import FakeNotifier
+from bistman.pipeline import ProcessedDisclosure
+from bistman.sources.base import DisclosureDetail, DisclosureStub, FundamentalRow
+from bistman.triage import Route
+
+AT = datetime(2026, 11, 17, 10, tzinfo=timezone.utc)
+QUOTE = "Şirketimiz ürün teslimi için 60 milyon TL bedelli satış sözleşmesi imzalamıştır."
+STUB = DisclosureStub(11, AT, "Deneme A.Ş.", "Sözleşme", tickers=("DENEM",))
+ITEM = ProcessedDisclosure(STUB, Route.PIPELINE, "scored", ticker="DENEM")
+ROW = FundamentalRow("DENEM", "2026-06-30", revenue_ttm=300_000_000, source="deneme:rapor")
+VERSION = PublishedRow(ROW, AT - timedelta(days=60))
+
+
+def detail(text, stub=STUB):
+    return DisclosureDetail(stub, text, attachment_count=0)
+
+
+def sale(*rows, quote=QUOTE):
+    return build_packet(ITEM, origin="sentetik", topic="satis_sozlesmesi", detail=detail(quote),
+                        quote=quote, statements=rows)
+
+
+def test_as_of_uses_latest_known_version_of_latest_period_only() -> None:
+    revision = PublishedRow(replace(ROW, revenue_ttm=600_000_000), AT)
+    after = PublishedRow(replace(ROW, period_end="2026-09-30", revenue_ttm=99), AT + timedelta(seconds=1))
+    other = PublishedRow(replace(ROW, ticker="DIGER", revenue_ttm=42), AT)
+    older_period = PublishedRow(replace(ROW, period_end="2026-03-31", revenue_ttm=40), AT)
+    assert sale(VERSION)["olcek"]["bedel_ciro_yuzde"] == 20
+    p = sale(revision, after, other, older_period, VERSION)
+    assert p == sale(revision)  # kayıt sırası/saat sonrasındaki bilanço geçmişi değiştirmez
+    assert p["olcek"]["bedel_ciro_yuzde"] == 10
+    assert p["olcek"]["tablo_yayini"] == AT.isoformat()
+    assert p["olcek"]["donem_sonu"] == ROW.period_end
+    assert p["olcek"]["kaynak"] == ROW.source
+    assert set(p) == {"konu", "kapsam", "hisse", "kaynak", "yayin", "kanit", "kanit_yeri", "tutar", "olcek"}
+
+
+@pytest.mark.parametrize("version", [
+    PublishedRow(ROW, None), PublishedRow(ROW, AT.replace(tzinfo=None)),
+    PublishedRow(ROW, AT + timedelta(minutes=1)), PublishedRow(replace(ROW, ticker="DIGER"), AT),
+    PublishedRow(replace(ROW, period_end="2027-12-31"), AT),
+])
+def test_absent_point_in_time_denominator_never_silences_confirmed_event(version) -> None:
+    packet = sale(version)
+    assert packet["tutar"] == {"deger": "60000000", "birim": "TRY"}
+    assert "olcek" not in packet and packet["sinir"] == "haber_aninda_yayimlanmis_tablo_yok"
+
+
+@pytest.mark.parametrize("row", [replace(ROW, flags=("ttm_gap",)), replace(ROW, currency="USD"),
+                                  replace(ROW, revenue_ttm=0), replace(ROW, statement_type="bank")])
+def test_incomparable_revenue_is_not_used(row) -> None:
+    p = sale(PublishedRow(row, AT))
+    assert "olcek" not in p and p["sinir"] == "karsilastirilabilir_ttm_ciro_yok"
+
+
+def test_only_relevant_numbers_affect_contract_packet() -> None:
+    new_balance = replace(VERSION, row=replace(ROW, equity=700_000_000, net_income_ttm=-12_000_000))
+    assert compact_json(sale(new_balance)) == compact_json(sale(VERSION))
+    assert sale(VERSION, quote=QUOTE.replace("60 milyon", "30 milyon"))["olcek"]["bedel_ciro_yuzde"] == 10
+
+
+def test_unconverted_fx_and_ambiguous_amounts_cannot_be_used_for_scale() -> None:
+    fx = sale(VERSION, quote=QUOTE.replace("TL", "EUR"))
+    assert fx["tutar"]["birim"] == "EUR" and fx["sinir"] == "tarihli_kur_yok" and "olcek" not in fx
+    two = sale(VERSION, quote=QUOTE + " Projenin toplam bütçesi 90 milyon TL'dir.")
+    assert two["sinir"] == "ana_tutar_belirsiz" and "olcek" not in two and "tutar" not in two
+
+
+@pytest.mark.parametrize(("body", "quote", "reason"), [
+    ("Duruş açıklanmadı.", "Duruş açıklandı.", "alinti_kayitta_yok"),
+    ("Şirkete ceza verilmesi söz konusu değildir.", "Şirkete ceza verilmesi", "alinti_cumle_sinirinda_degil"),
+    ("", "", "olay_kaniti_eksik"),
+    ("A" * MAX_CHARS + ".", "A" * MAX_CHARS + ".", "daha_kisa_tam_kanit_sec"),
+])
+def test_bad_evidence_is_held_not_silently_truncated(body, quote, reason) -> None:
+    with pytest.raises(PacketHeld, match=reason):
+        build_packet(ITEM, origin="sentetik", topic="sirket_aciklamasi", detail=detail(body), quote=quote)
+
+
+def test_identity_and_scope_are_not_invented() -> None:
+    with pytest.raises(PacketHeld, match="kaynak_dogrulanmadi"):
+        build_packet(ITEM, origin="dogrulanmamis", topic="uretim_durusu", detail=detail(QUOTE), quote=QUOTE)
+    unknown = replace(ITEM, status="unresolved_ticker", ticker=None)
+    with pytest.raises(PacketHeld, match="unresolved_ticker"):
+        build_packet(unknown, origin="sentetik", topic="sirket_aciklamasi", detail=detail(QUOTE), quote=QUOTE)
+    with pytest.raises(PacketHeld, match="piyasa_kapsami_dogrulanmadi"):
+        build_packet(unknown, origin="sentetik", topic="endeks_parametresi", detail=detail(QUOTE), quote=QUOTE)
+
+
+def test_offline_replay_against_recorded_feed_and_comparison_cases(monkeypatch) -> None:
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[1] / "scripts"))
+    import baglam_provasi as demo
+
+    feed = demo.parse_light((demo.FIXTURE / "list_light_live.json").read_bytes())
+    routes, with_amount = demo.scan_feed(feed.items)
+    assert not feed.rejected and len(feed.items) == 397
+    assert (routes[Route.ROUTINE], routes[Route.MECHANICAL], routes[Route.PIPELINE], with_amount) == (151, 127, 119, 0)
+    outcomes = {o.case.stub.index: o for o in asyncio.run(demo.replay(demo.cases({d.index: d for d in feed.items})))}
+    notifier = FakeNotifier()
+    report = asyncio.run(dispatch((o.processed for o in outcomes.values()), notifier, day=AT.date(), cfg=demo.ScoringConfig.load()))
+    assert [k for k, _ in notifier.sent] == ["1:ORNEK", "digest:2026-11-17"]
+    assert {r.disclosure.index for r in report.ranked.digest} == {2, 3, 1698956}
+    assert all(s in report.digest_text for s in ("Piyasa gündemi", "endeks ağırlıklarını", "teslimat", "10 milyon EUR"))
+    ready = [o.packet for o in outcomes.values() if o.packet is not None]
+    assert len(ready) == 5 and all(len(compact_json(p)) <= MAX_CHARS for p in ready)
+    assert outcomes[1].processed.features.ratio_revenue == 20
+    assert outcomes[1].packet["olcek"]["bedel_ciro_yuzde"] == 20
+    assert outcomes[2].processed.planned_action == "digest" and outcomes[2].packet["konu"] == "uretim_durusu"
+    index = outcomes[1698956].packet
+    assert [p for p in ready if p["kapsam"] == "piyasa_gundemi"] == [index]
+    assert "hisse" not in index and index["kanit_yeri"] == "baslik"
+    assert "bulunmamaktadır." in outcomes[1699030].packet["kanit"]
+    assert all("olcek" not in p for p in ready if p["konu"] != "satis_sozlesmesi")
+    assert outcomes[1698981].held == "ihale_sonucu_icin_detay_gerekli"
+    assert outcomes[1698691].held == "piyasa_kapsami_dogrulanmadi"
+
+
+@pytest.mark.parametrize("wrong", [replace(STUB, index=99), replace(STUB, tickers=("DIGER",))])
+def test_another_record_cannot_supply_packet_evidence(wrong) -> None:
+    with pytest.raises(PacketHeld, match="detay_kayit_uyusmazligi"):
+        build_packet(ITEM, origin="kap_arsiv", topic="satis_sozlesmesi", quote=QUOTE, detail=detail(QUOTE, wrong))
+
+
+@pytest.mark.parametrize("body,quote", [
+    (QUOTE + " Ancak sözleşme daha sonra feshedildi.", QUOTE),
+    ("Ana projenin toplam bütçesi 1 milyar TL'dir.", "Ana projenin toplam bütçesi 1 milyar TL'dir."),
+    ("Başka bir şirket 10 milyon TL bedelli satış sözleşmesi imzalamıştır.",
+     "Başka bir şirket 10 milyon TL bedelli satış sözleşmesi imzalamıştır."),
+])
+def test_whole_sentence_alone_does_not_prove_current_issuer_sale(body, quote) -> None:
+    with pytest.raises(PacketHeld, match="satis_kaniti_yetersiz"):
+        build_packet(ITEM, origin="sentetik", topic="satis_sozlesmesi", quote=quote, detail=detail(body))
+
+
+def test_quote_price_must_agree_with_the_rest_of_the_same_disclosure() -> None:
+    body = QUOTE + " Güncel sözleşme bedeli 160 milyon TL'dir."
+    with pytest.raises(PacketHeld, match="bedel_baglamla_celisiyor"):
+        build_packet(ITEM, origin="sentetik", topic="satis_sozlesmesi", quote=QUOTE,
+                     statements=(VERSION,), detail=detail(body))
+
+
+def test_unrepresentable_scale_is_omitted_not_infinite_or_a_crash() -> None:
+    p = sale(PublishedRow(replace(ROW, revenue_ttm=1e-315), AT))
+    assert p["sinir"] == "oran_hesaplanamadi" and "olcek" not in p

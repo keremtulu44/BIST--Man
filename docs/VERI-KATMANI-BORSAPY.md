@@ -1,19 +1,13 @@
-# VERİ KATMANI: borsapy (kişisel/eğitim kullanımı)
+# Arşiv: borsapy 0.11.0 deneyi ve TTM bulguları
 
-> Karar: veri erişimi **borsapy** üzerinden. Amaç kişisel/eğitim/deneyim →
-> MKK resmî API kaydı, BIST DataStore lisansı, VERDA sözleşmesi **gerekmiyor**.
-> `borsapy` lisans metni kişisel/eğitim kullanımına izin veriyor.
->
-> Doğrulama yöntemi: `borsapy==0.11.0` wheel'i indirilip **kaynak kodu okundu**.
-> Aşağıdaki her satır koddan çıkarıldı, dokümandan değil.
+> **Bir bağımlılık kararı değil, deney kaydıdır.** O dönemde paket kaynağı okundu ve THYAO/AKBNK verisiyle karşılaştırıldı. Bugünkü pakette borsapy bağımlılığı yoktur: KAP için kendi istemcimiz, mali tablolar için doğrudan İş Yatırım istemcisi vardır. [Gerçekte kullanılan kaynaklar](VERI-KAYNAKLARI.md) · [güncel amaç](ANA-MANTIK.md).
 
 ---
 
 
 ## ⚠️ Doğrulama bulguları (17.11.2026 — kullanıcının makinesi, gerçek veri)
 
-Aşağıdakiler bu dokümanın yukarıdaki bölümlerini **geçersiz kılar**. Gerçek
-çalıştırma raporu: `docs/dogrulama-sonuc.json`.
+Bu bulgular, aşağıdaki borsapy tabanlı entegrasyon önerisinin neden uygulanmadığını açıklar. [Kaydedilmiş ilk çalıştırma raporu](dogrulama-sonuc.json).
 
 | Alan | Beklenen | Gerçek | Sonuç |
 |---|---|---|---|
@@ -26,11 +20,11 @@ Aşağıdakiler bu dokümanın yukarıdaki bölümlerini **geçersiz kılar**. G
 %0.0000). Tutarlılık doğruluk değil — yıllık tabloyla karşılaştırmadan
 "doğrulandı" denmez.
 
-## 1. Tek cümlelik sonuç
+## 1. Kütüphane incelemesindeki ilk öneri
 
 **borsapy iyi bir "detay" katmanı, kötü bir "firehose".**
 Piyasa geneli bildirim akışını vermiyor (sadece hisse bazlı, son 20).
-O yüzden mimari ikiye ayrılıyor:
+Bu yüzden, sonraki ölçümlerden önce şu ayrım önerilmişti:
 
 ```
 FIREHOSE (bizim, ~40 satır)        DETAY (borsapy)
@@ -163,7 +157,7 @@ der ve haftalarca ölü kalır. Bu yüzden adapter'da tek kural:
 
 ---
 
-## 5. Sürüm ve tedarik zinciri
+## 5. Önerideki sürüm ve tedarik zinciri (uygulanmadı)
 
 `borsapy` **0.11.0**, PyPI'da `Development Status :: 3 - Alpha`, tek geliştirici.
 Kişisel proje için sorun değil, ama:
@@ -263,11 +257,11 @@ yönü (borsapy'yi mi, kendi hesabımızı mı kullanacağız) o zaman netleşir
 
 ---
 
-## 10. Karara bağlananlar (decision log güncellemesi)
+## 10. O taslaktaki tercihler (yürürlükte değil)
 
 - **D5 →** Finansal tablolar: `borsapy` (İş Yatırım `MaliTablo`) + bizim TTM doğrulaması.
 - **D6 →** Bildirim akışı: **kendi `kap_firehose`** (borsapy'de piyasa geneli feed yok); detay/HTML `borsapy`.
-- **D9 →** Lisans/ resmiyet: gerekmiyor, kişisel/eğitim kullanımı.
+- **D9 →** Çalışmanın kapsamı kişisel/eğitim idi; dış kaynakların kullanım veya dağıtım izni bu deneyden çıkarılamaz.
 - **Yeni D12 →** borsapy tam sürüm pinli, tek dosyada izole, otomatik upgrade yok.
 - **Yeni D13 →** borsapy çağrıları `asyncio.to_thread` + `Semaphore(4)` ile köprülenir.
 - **Yeni D14 →** `Ticker` nesnesi asla uzun ömürlü tutulmaz (`cached_property` bayatlar).
