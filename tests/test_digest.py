@@ -201,3 +201,19 @@ def test_dispatch_keys_are_unique() -> None:
     asyncio.run(dispatch(results, notifier, day=DAY, cfg=CFG))
     keys = [key for key, _ in notifier.sent]
     assert len(keys) == len(set(keys))
+
+
+def test_uncertain_ranks_by_impact_not_score() -> None:
+    """Belirsiz ama büyük olay, düşük skoruna rağmen temettünün ÜSTÜNDE.
+
+    Skorla sıralansaydı (%469 -> 2.50) 7.50'lik temettünün altına düşerdi;
+    oysa o etiket tam da "olay büyük, emniyet düşük" demek.
+    """
+    from bistman.digest import sort_metric
+
+    weird = item(1, "MTRKS", 15_000_000_000)          # impact 10, skor 2.50
+    dividend = item(2, "MTRKS", 500_000_000, subject="Temettü Dağıtımı")  # 7.50
+    assert weird.decision.push_score < dividend.decision.push_score
+    assert sort_metric(weird) > sort_metric(dividend)
+    ranked = rank([dividend, weird])
+    assert ranked.pushes[0] is weird

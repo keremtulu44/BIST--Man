@@ -360,3 +360,35 @@ def test_multi_symbol_title_stays_unresolved() -> None:
     )
     assert results[0].ticker is None
     assert results[0].status == "unresolved_ticker"
+
+
+def test_uncertain_push_is_labeled_in_message() -> None:
+    """`push_uncertain` mesajda etiketlenmeli: skoru düşük, olayı büyük."""
+    # 15 mlr sözleşme / 3.2 mlr ciro = %469 -> implausible_ratio -> push_uncertain
+    stub = DisclosureStub(
+        index=12,
+        published_at=datetime(2026, 11, 17, 9, 30, tzinfo=UTC),
+        title="MTRKS A.Ş.",
+        subject="Yeni Sözleşme İmzalanması",
+        summary="Sözleşme bedeli 15 milyar TL'dir.",
+        disclosure_class="öda",
+        tickers=("MTRKS",),
+    )
+    results = asyncio.run(
+        process_batch(
+            [stub],
+            resolver=RESOLVER,
+            fundamentals={
+                "MTRKS": FundamentalRow(
+                    ticker="MTRKS", period_end="2026-09-30",
+                    revenue_ttm=3_200_000_000.0, source="test",
+                )
+            },
+            cfg=CFG,
+        )
+    )
+    item = results[0]
+    assert item.decision.action == "push_uncertain"
+    message = render_message(item)
+    assert "belirsiz" in message
+    assert "implausible_ratio" in message

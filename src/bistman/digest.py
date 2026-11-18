@@ -12,6 +12,8 @@ Kurallar (hepsi testli):
    skorlu olan kalır; tekrar sayısı raporda görünür (sessiz eleme yok).
 2. **Sıralama**: `push_score` azalan; eşitlikte `impact`, sonra hisse kodu,
    yayın zamanı, index. Deterministik — aynı girdi aynı sırayı verir.
+   **İstisna:** `push_uncertain` impact ile sıralanır (emniyeti düşük olduğu
+   için skoru düşük; skorla sıralamak büyük olayı temettünün altına gömer).
 3. **Bütçe**: hisse başına günde en fazla `budget` push. Aşan push **düşürülmez**,
    özetin en üstüne iner (`[bütçe]` etiketiyle). Kaybetmek yok, sırası değişir.
 4. **Özet (digest)**: `digest` kararlı olaylar + bütçeden düşenler, yine skora
@@ -49,10 +51,25 @@ class Ranked:
         return len(self.pushes) + len(self.digest)
 
 
+def sort_metric(item: ProcessedDisclosure) -> float:
+    """Sıralamada kullanılan tek sayı.
+
+    `push_uncertain` (belirsiz ama büyük) **impact** ile sıralanır, push_score ile
+    değil. Sebep: o etiket tam da "emniyet düşük olduğu için skor düşük çıkıyor,
+    ama olay büyük" demek. `push_score` ile sıralarsak 15 milyarlık sözleşme
+    (%469 → skor 2.50, impact 10) 500 milyonluk temettünün (7.50) altına düşer —
+    yani etiket kendi amacını boşa çıkarır. Ölçüm: docs/ONEM-DENETIMI.md C.
+    """
+    assert item.decision is not None
+    if item.decision.action == "push_uncertain":
+        return item.decision.impact
+    return item.decision.push_score
+
+
 def _sort_key(item: ProcessedDisclosure) -> tuple:
     assert item.decision is not None
     return (
-        -item.decision.push_score,
+        -sort_metric(item),
         -item.decision.impact,
         item.ticker or "~",
         item.disclosure.published_at,

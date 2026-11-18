@@ -68,6 +68,12 @@ def render_message(item: ProcessedDisclosure) -> str:
     if d.summary:
         lines.append(d.summary.strip()[:300])
     lines.append(" | ".join(item.decision.reasons[:3]))
+    # `push_uncertain` etiketi mesajda GÖRÜNMELİ: yoksa kullanıcı skoru 2.50 olan
+    # bir mesajı, gerekçesiz "küçük haber" sanır (impact 10 olsa bile).
+    if item.decision.action == "push_uncertain":
+        flags = ", ".join(item.features.flags) if item.features else ""
+        detail = flags or "emniyet düşük"
+        lines.append(f"⚠️ belirsiz: {detail} — tutar/oran doğrulanmadan gönderildi")
     return "\n".join(lines)
 
 
