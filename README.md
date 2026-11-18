@@ -26,6 +26,7 @@ kural tabanlı skorlayan ve bildirim kanallarına dağıtan hat.
 - **[docs/DOGRULAMA-ADIMLARI.md](docs/DOGRULAMA-ADIMLARI.md)** ← **senin yapacağın 2 doğrulama (PowerShell komutları)**
 - **[docs/HABER-DAVRANISI.md](docs/HABER-DAVRANISI.md)** — sistem bir habere ne yapıyor: 10 bulgu, kanıtlı
 - **[docs/ONEM-DENETIMI.md](docs/ONEM-DENETIMI.md)** — "önem" tek sayıda üç şeyi taşıyor: kanıtlı denetim
+- **[docs/DURUM-VE-LLM-PLANI.md](docs/DURUM-VE-LLM-PLANI.md)** — sistem şu an nasıl + LLM nereye bağlanır (öner/doğrula/karar)
 - **[docs/ORNEK-VAKALAR.md](docs/ORNEK-VAKALAR.md)** — 12 vaka: metin → tutar → oran → karar → Telegram mesajı
 - **[docs/SIRALAMA-VE-DIGEST.md](docs/SIRALAMA-VE-DIGEST.md)** — önem sırası, günlük bütçe, özet metni
 - **[docs/METIN-BILANCO-DENETIMI.md](docs/METIN-BILANCO-DENETIMI.md)** — metinleştirme sağlam; sıralama yok, bilançonun 1/6'sı kullanılıyor
