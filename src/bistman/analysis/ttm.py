@@ -201,10 +201,23 @@ def from_cumulative(points: Sequence[TTMPoint]) -> TTM:
 
     if latest.quarter == 4:
         # En son veri zaten tam yıl sonu
-        return TTM(fy.value, "cumulative", (fy.label,), (), "son veri tam yıl sonu")
+        tail_flags = ("data_gap",) if zeros else ()
+        return TTM(fy.value, "cumulative", (fy.label,), tail_flags, "son veri tam yıl sonu")
 
     ytd_now = latest
     used.append(ytd_now.label)
+
+    # Bir önceki tam yıl (ytd_now.year - 1 Q4) eksikse eski bir FY ile güncel
+    # YTD'yi karıştırmak aradaki çeyrekleri sessizce atlar (ör. 2024Q4+2026Q2-2025Q2).
+    if fy_year != ytd_now.year - 1:
+        gap_flags = ("ttm_gap", "stale_fundamentals") + (("data_gap",) if zeros else ())
+        return TTM(
+            fy.value,
+            "cumulative",
+            (fy.label,),
+            gap_flags,
+            f"{ytd_now.year - 1}Q4 yok -> son tam yıl ({fy.label}) kullanıldı",
+        )
 
     # Geçen yıl aynı dönem
     prev = next((p for p in pts if p.year == ytd_now.year - 1 and p.quarter == ytd_now.quarter), None)

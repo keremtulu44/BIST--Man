@@ -161,3 +161,18 @@ def test_bank_template_uses_same_arithmetic() -> None:
     naive = naive_borsapy_ttm(points)
     assert correct is not None and naive is not None
     assert naive > correct
+
+
+def test_missing_prior_full_year_never_mixes_older_fy_silently() -> None:
+    """2025Q4 eksikken 2024Q4 + 2026Q2 - 2025Q2 güvenilir TTM sayılamaz."""
+    points = [TTMPoint(2024, 4, 1000.0), TTMPoint(2025, 2, 600.0), TTMPoint(2026, 2, 800.0)]
+    result = compute_ttm(points, annual={2024: 1000.0})
+    assert "ttm_gap" in result.flags and "stale_fundamentals" in result.flags
+    assert result.reliable is False
+
+
+def test_year_end_preserves_zero_data_gap_flag() -> None:
+    points = [TTMPoint(2025, 1, 200.0), TTMPoint(2025, 2, 0.0), TTMPoint(2025, 4, 1000.0)]
+    result = from_cumulative(points)
+    assert result.value == pytest.approx(1000.0)
+    assert "data_gap" in result.flags

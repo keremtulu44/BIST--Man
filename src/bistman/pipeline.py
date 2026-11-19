@@ -305,7 +305,14 @@ def _resolve_ticker(disclosure: DisclosureStub, resolver: TickerResolver) -> str
     symbols = tuple(dict.fromkeys(symbols_in_title(disclosure.title)))
     if len(symbols) > 1:
         return None
-    return resolver.resolve(disclosure.title).ticker or (symbols[0] if symbols else None)
+    by_title = resolver.resolve(disclosure.title).ticker
+    if by_title:
+        return by_title
+    # Başlıktaki `/ SEMBOL` yalnız bilinen bir hisse koduysa kabul edilir;
+    # "... / ANKARA", "... / USD" veya fon kodu "... / IDH" hisse sayılmaz.
+    if symbols and resolver.has_ticker(symbols[0]):
+        return symbols[0]
+    return None
 
 
 def _dec(value: float | None) -> Decimal | None:

@@ -388,6 +388,18 @@ def test_multi_symbol_title_stays_unresolved() -> None:
     assert results[0].status == "unresolved_ticker"
 
 
+@pytest.mark.parametrize("tail", ["ANKARA", "USD", "IDH"])
+def test_unknown_single_token_after_slash_is_not_treated_as_stock(tail: str) -> None:
+    resolver = TickerResolver.from_pairs([("MTRKS", "MATRİKS FİNANSAL TEKNOLOJİLER A.Ş.")])
+    [res] = asyncio.run(
+        process_batch(
+            [_stub(99, f"KURUM DUYURUSU / {tail}", "Kamuyu Aydınlatma Platformu Duyurusu")],
+            resolver=resolver, fundamentals={}, cfg=CFG,
+        )
+    )
+    assert res.ticker is None and res.status == "unresolved_ticker"
+
+
 def test_uncertain_push_is_labeled_in_message() -> None:
     """`push_uncertain` mesajda etiketlenmeli: skoru düşük, olayı büyük."""
     # 15 mlr sözleşme / 3.2 mlr ciro = %469 -> implausible_ratio -> push_uncertain

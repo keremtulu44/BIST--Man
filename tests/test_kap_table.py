@@ -222,6 +222,16 @@ def test_body_text_shrinks_payload() -> None:
     assert len(body_text(BODY_HTML)) < len(BODY_HTML) * 0.35
 
 
+def test_body_text_only_drops_class_attribute_not_plain_text() -> None:
+    html = (
+        '<div><p>Şirketimiz content-en kodlu modülü teslim etti.</p>'
+        '<div class="gwt-HTML content-en"><p>English copy</p></div></div>'
+    )
+    cleaned = body_text(html)
+    assert "content-en kodlu modülü teslim etti." in cleaned
+    assert "English copy" not in cleaned
+
+
 # ------------------------------------------------------------ yapı bozulunca
 
 

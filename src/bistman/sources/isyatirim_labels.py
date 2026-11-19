@@ -86,7 +86,7 @@ ROLE_KEYWORDS: dict[str, tuple[str, ...]] = {
         "hasilat",
         "net satislar",
         "faiz gelirleri",
-        "satis hasılati",
+        "satis hasilati",
         "toplam gelir",
     ),
     "net_income": (

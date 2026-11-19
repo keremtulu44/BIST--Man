@@ -73,6 +73,11 @@ class TickerResolver:
     def __len__(self) -> int:
         return len(self._exact)
 
+    def has_ticker(self, ticker: str) -> bool:
+        """Verilen sembol bu çözümleyicinin şirket evreninde tanımlı mı?"""
+        code = (ticker or "").strip().upper()
+        return bool(code) and any(t == code for _, t in self._names)
+
     def resolve(self, title: str) -> Resolution:
         key = name_norm(title)
         if not key:
@@ -103,52 +108,122 @@ class TickerResolver:
         return Resolution(best_ticker, "fuzzy", best_score)
 
 
-# Unvanlarda ayırt edici olmayan kelimeler (her şirkette geçebilir).
-# Bunlar eşleşme puanına sayılmaz; yoksa "SANAYİ VE TİCARET" her şirkete benzer.
+# Unvanlarda ayırt edici olmayan kelimeler (hukuki ve genel ticaret ekleri).
+# Dikkat: "ak" ve "is" (AK YATIRIM vs İŞ YATIRIM) ayırt edici marka köküdür, burada YOKTUR;
+# "pazarlama", "yatirim", "holding", "uretim" de grup iştiraklerini ayırdığı için silinmez.
 _GENERIC = frozenset(
     {
-        "ve", "a", "s", "as", "ao", "anonim", "sirketi", "ticaret", "sanayi",
-        "ltd", "sti", "holding", "yatirim", "uretim", "pazarlama", "dis",
-        "turkiye", "turkiyedeki", "grup",
+        "ve", "a", "s", "as", "ao", "ta", "tas", "tao", "tc",
+        "anonim", "sirketi", "ticaret", "sanayi", "sanayii", "ltd", "sti",
+        "turkiye", "turkiyedeki",
     }
+)
+# Birçok farklı şirketin unvanında ortak geçen sektör/faaliyet kelimeleri:
+# "HALK YATIRIM MENKUL DEĞERLER" ile "İŞ YATIRIM MENKUL DEĞERLER" veya
+# "HALK FİNANSAL KİRALAMA" ile "VAKIF FİNANSAL KİRALAMA" yalnız bu kelimeler
+# benziyor diye eşleşemez; marka köklerinin de bire-bir uyuşması şarttır.
+_SECTOR_WORDS = frozenset(
+    {
+        "yatirim", "yatirimlari", "menkul", "degerler", "kiymetler",
+        "finansal", "finansman", "kiralama", "faktoring",
+        "gayrimenkul", "girisim", "sermayesi", "ortakligi",
+        "portfoy", "yonetimi", "emeklilik", "hayat", "sigorta",
+        "bankasi", "holding", "sirketler", "grubu",
+        "enerji", "elektrik", "uretim", "uretimi", "santralleri",
+        "teknoloji", "teknolojiler", "teknolojileri",
+        "hizmet", "hizmetleri", "iletisim", "bilisim", "sistemleri",
+        "gida", "cimento", "otomotiv", "elektronik", "madencilik",
+        "insaat", "turizm", "tekstil", "kimya", "tarim",
+        "pazarlama", "perakende", "magazalari", "lojistik", "tasimacilik",
+        "saglik", "servis", "dis", "ic",
+    }
+)
+# Türkçe çekim ekleri (çoğul/iyelik): "teknoloji"~"teknolojiler", "hizmet"~"hizmetleri".
+# Serbest önek eşleşmesi "turk"~"turkcell" veya "enerji"~"enerjisa" hatası üretir.
+_INFLECTION_SUFFIXES = frozenset(
+    {"i", "si", "u", "su", "ler", "lar", "leri", "lari", "yi", "yu"}
 )
 MIN_SIGNIFICANT_TOKENS = 2
 
 
 def _significant_tokens(text: str) -> list[str]:
-    return [t for t in text.split() if t not in _GENERIC and len(t) >= 3]
+    return [t for t in text.split() if t not in _GENERIC and len(t) >= 2]
 
 
-def _token_match(a: str, b: str) -> bool:
+def _token_match(a: str, b: str, *, allow_typo: bool = False) -> bool:
     if a == b:
         return True
-    # Türkçe çekim eki toleransı: "teknoloji" ~ "teknolojiler", "gida" ~ "gidalar"
-    if len(a) >= 4 and len(b) >= 4:
-        return a.startswith(b) or b.startswith(a)
+    short, long = (a, b) if len(a) <= len(b) else (b, a)
+    if len(short) >= 4 and long.startswith(short):
+        if long[len(short):] in _INFLECTION_SUFFIXES:
+            return True
+    if allow_typo and len(short) >= 5 and len(long) - len(short) <= 1:
+        return SequenceMatcher(None, a, b).ratio() >= 0.88
     return False
 
 
-def _similarity(a: str, b: str) -> float:
-    """İki unvan arası benzerlik: harf benzerliği + kelime kapsama, en iyisi kazanır.
+def _paired_matches(
+    sig_a: list[str], sig_b: list[str], *, allow_typo: bool = False
+) -> int:
+    """Bire-bir kelime eşleşmesi: aynı kökten iki kelime tek hedefe iki kez sayılamaz."""
+    used: set[int] = set()
+    matched = 0
+    for token in sig_a:
+        hit = next(
+            (idx for idx, candidate in enumerate(sig_b)
+             if idx not in used and _token_match(token, candidate, allow_typo=allow_typo)),
+            None,
+        )
+        if hit is not None:
+            used.add(hit)
+            matched += 1
+    return matched
 
-    Neden kelime kapsama: harf bazlı oran, "TEKNOLOJI" ile "TEKNOLOJILER" arasında
-    hak ettiğinden düşük puan veriyor (0.84) ve doğru eşleşme kaçıyor. Kelime
-    kapsama bunu düzeltir: {matriks, finansal, teknoloji} kümesi adayın
-    çekirdeğini tamamen kapsıyor.
+
+def _brands_compatible(sig_a: list[str], sig_b: list[str]) -> bool:
+    """Sektör kelimeleri çıkarıldığında kalan ayırt edici marka kökleri bire-bir uyuşuyor mu?"""
+    brand_a = [t for t in sig_a if t not in _SECTOR_WORDS]
+    brand_b = [t for t in sig_b if t not in _SECTOR_WORDS]
+    if not brand_a and not brand_b:
+        return True
+    if len(brand_a) != len(brand_b):
+        return False
+    return _paired_matches(brand_a, brand_b, allow_typo=True) == len(brand_a)
+
+
+def _similarity(a: str, b: str) -> float:
+    """İki unvan arası benzerlik: marka kökü korumalı harf + simetrik kelime örtüşmesi.
+
+    - Ayırt edici marka kelimeleri uyuşmuyorsa ("AK YATIRIM" vs "İŞ YATIRIM",
+      "ZİRAAT YATIRIM" vs "İŞ YATIRIM", "ALARKO TARIM" vs "ALARKO CARRIER")
+      ortak sektör/ticaret ekleri skoru şişiremez -> `0.0`.
+    - Simetrik (`max`) payda sayesinde halka açık şirketin kelimelerini kapsayan
+      bağlı ortaklıklar ("ENERJİSA ÜRETİM SANTRALLERİ", "ARÇELİK PAZARLAMA")
+      ana hisseye bağlanmaz; gerçek çekim farkları ("TEKNOLOJİ"~"TEKNOLOJİLER") korunur.
     """
     direct = SequenceMatcher(None, a, b).ratio()
     if direct >= 0.99:
         return direct
 
-    sorted_a = " ".join(sorted(a.split()))
-    sorted_b = " ".join(sorted(b.split()))
-    best = max(direct, SequenceMatcher(None, sorted_a, sorted_b).ratio())
-
     sig_a = _significant_tokens(a)
     sig_b = _significant_tokens(b)
-    if len(sig_a) < MIN_SIGNIFICANT_TOKENS or len(sig_b) < MIN_SIGNIFICANT_TOKENS:
-        return best
+    if not _brands_compatible(sig_a, sig_b):
+        return 0.0
 
-    matched = sum(1 for x in sig_a if any(_token_match(x, y) for y in sig_b))
-    containment = matched / min(len(sig_a), len(sig_b))
-    return max(best, containment)
+    # Genel ticaret ekleri ("sanayi ve ticaret") iki farklı iştirakin harf oranını şişirmesin.
+    core_a = " ".join(sig_a) if sig_a else a
+    core_b = " ".join(sig_b) if sig_b else b
+    char_score = max(
+        SequenceMatcher(None, core_a, core_b).ratio(),
+        SequenceMatcher(None, " ".join(sorted(sig_a)), " ".join(sorted(sig_b))).ratio()
+        if sig_a and sig_b else 0.0,
+    )
+
+    if len(sig_a) < MIN_SIGNIFICANT_TOKENS or len(sig_b) < MIN_SIGNIFICANT_TOKENS:
+        return char_score
+
+    overlap = _paired_matches(sig_a, sig_b, allow_typo=True) / max(len(sig_a), len(sig_b))
+    # Aynı marka altında farklı sektör iştiraki ("ALARKO TARIM" vs "ALARKO GIDA") elenir.
+    if overlap < 0.75:
+        return min(char_score, overlap)
+    return max(char_score, overlap)

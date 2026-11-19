@@ -5,9 +5,9 @@ build-backend = "hatchling.build"
 [project]
 name = "bistman"
 version = "0.1.0"
-description = "BIST 50 + emtia bildirim/skorlama hattı (kişisel kullanım)"
+description = "Grafik alarmları için doğrulanmış ve zaman-güvenli sessiz KAP bağlam arşivi"
 requires-python = ">=3.11"
-dependencies = ["httpx>=0.27,<1"]  # KAP ve Telegram istemcileri
+dependencies = ["httpx>=0.27,<1"]  # KAP istemcisi (tek dış bağımlılık)
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]

@@ -39,6 +39,8 @@ class DisclosureStub:
     """Dolu ise yapısal hisse kodları (detay ucu / geçmiş tablosu)."""
     member_oid: str | None = None
     """Şirketin KAP üye OID'i — geçmiş sorgusu ve detay için gerekir."""
+    minute_precision: bool = False
+    """Üye geçmişi HTML tablosu saniye vermez (HH:MM); detay eşlemesinde dikkate alınır."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,10 +100,24 @@ class DisclosureDetail:
     attachment_count: int
     is_late: bool = False
 
+    def matches_record(self, expected: DisclosureStub) -> bool:
+        """Liste/geçmiş ve detayın aynı bildirim kimliği ve yayın zamanına aitliği."""
+        if self.stub.index != expected.index:
+            return False
+        if self.stub.published_at == expected.published_at:
+            return True
+        if expected.minute_precision and not self.stub.minute_precision:
+            return (
+                self.stub.published_at.replace(second=0, microsecond=0)
+                == expected.published_at.replace(second=0, microsecond=0)
+            )
+        return False
+
     def matches(self, expected: DisclosureStub, ticker: str | None) -> bool:
         """Liste ve detayın aynı kayda ait olduğu ve yapısal hissenin çelişmediği sınır."""
-        return (self.stub.index == expected.index and self.stub.published_at == expected.published_at
-                and (not self.stub.tickers or set(self.stub.tickers) == {ticker}))
+        return self.matches_record(expected) and (
+            not self.stub.tickers or set(self.stub.tickers) == {ticker}
+        )
 
 
 @dataclass(frozen=True, slots=True)

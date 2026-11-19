@@ -31,7 +31,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Iterable
 
-from .dates import UnparsableDate, parse_kap_datetime
+from .dates import TRT, UnparsableDate, parse_kap_datetime
 from .text import SYMBOL_RE
 
 __all__ = [
@@ -113,43 +113,46 @@ def html_to_text(raw: str) -> str:
 
 
 def _drop_elements_with_class(raw: str, needle: str) -> str:
-    """`class` değeri `needle` içeren elemanları (iç içe olanlarla) siler.
+    """`class` özniteliği `needle` sınıfını içeren elemanları (iç içe olanlarla) siler.
 
-    KAP gövdesinde İngilizce kopya `content-en` sınıfıyla geliyor. Regex ile
-    eşleşen kapanış etiketi bulunamaz (iç içe div'ler var); aynı etiket adını
-    sayarak dengeli silme yapılır. Bozuk HTML'de index bulunamazsa o noktadan
-    itibaren kesilir — gövde metni için kabul edilebilir, tablo için değil.
+    KAP gövdesinde İngilizce kopya `content-en` sınıfıyla geliyor. Yalnız açılış
+    etiketindeki `class=...` değeri kontrol edilir; Türkçe metnin içinde geçen
+    ifadeler kapsayıcı etiketi sildiremez.
     """
+    token = re.escape(needle)
+    open_with_class = re.compile(
+        rf"<(?P<tag>[a-zA-Z][\w-]*)\b[^>]*\bclass\s*=\s*"
+        rf"(?:\"[^\"]*(?<![\w-]){token}(?![\w-])[^\"]*\""
+        rf"|'[^']*(?<![\w-]){token}(?![\w-])[^']*'"
+        rf"|{token}(?=[\s/>]))[^>]*>",
+        re.I,
+    )
     pos = 0
     while True:
-        at = raw.find(needle, pos)
-        if at < 0:
+        hit = open_with_class.search(raw, pos)
+        if hit is None:
             return raw
-        start = raw.rfind("<", 0, at)
-        if start < 0:
-            return raw
-        tag_match = re.match(r"<([a-zA-Z][\w-]*)", raw[start:])
-        if not tag_match:
-            pos = at + len(needle)
+        start = hit.start()
+        if hit.group(0).rstrip().endswith("/>"):
+            raw = raw[:start] + raw[hit.end():]
+            pos = start
             continue
-        tag = tag_match.group(1).lower()
-        open_re = re.compile(rf"<{tag}\b", re.I)
-        close_re = re.compile(rf"</{tag}\s*>", re.I)
+        tag = hit.group("tag").lower()
         depth = 0
         end = -1
-        for m in re.finditer(rf"<{tag}\b|</{tag}\s*>", raw[start:], re.I):
-            if m.group(0).startswith("</"):
+        for m in re.finditer(rf"<{tag}\b[^>]*>|</{tag}\s*>", raw[start:], re.I):
+            piece = m.group(0)
+            if piece.startswith("</"):
                 depth -= 1
                 if depth == 0:
                     end = start + m.end()
                     break
-            elif not m.group(0).endswith("/>"):
+            elif not piece.rstrip().endswith("/>"):
                 depth += 1
         if end < 0:
             end = len(raw)
         raw = raw[:start] + raw[end:]
         pos = start
-        del open_re, close_re
 
 
 _RE_FIELD_MARKER = re.compile(r"^[a-z][a-z0-9]*_[A-Z][A-Za-z0-9]+\|$")
@@ -208,7 +211,8 @@ def parse_when(cell: str, *, today: date | None = None) -> datetime:
             raise UnparsableDate(f"geçersiz tarih: {text!r}") from exc
     rel = _RE_RELATIVE.search(text)
     if rel:
-        base = today or datetime.now().date()
+        # Sunucu UTC çalışsa bile KAP'taki "Bugün/Dün" Türkiye saatine (TRT) göredir.
+        base = today or datetime.now(TRT).date()
         word = rel.group(1).lower()
         if word in {"dün", "dun"}:
             base = base - timedelta(days=1)

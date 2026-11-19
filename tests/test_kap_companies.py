@@ -72,3 +72,16 @@ def test_fetch_company_map_uses_injected_client() -> None:
 
     mapping = asyncio.run(fetch_company_map(FakeKap()))
     assert mapping["MTRKS"].startswith("8acae2")
+
+
+def test_parse_companies_builds_live_title_resolver() -> None:
+    from bistman.sources.kap_companies import build_company_resolver, parse_companies
+
+    entries = parse_companies(page(ESCAPED, ESCAPED_MULTI))
+    resolver = build_company_resolver(entries)
+    assert resolver.resolve("MATRİKS FİNANSAL TEKNOLOJİLER A.Ş.").ticker == "MTRKS"
+    # Aynı üyenin 'GARAN, TGB' ikincil kodu kendi unvanını belirsizliğe düşürmemeli.
+    assert resolver.resolve("TÜRKİYE GARANTİ BANKASI A.Ş.").ticker == "GARAN"
+    filtered = build_company_resolver(entries, universe=["MTRKS"])
+    assert filtered.resolve("MATRİKS FİNANSAL TEKNOLOJİLER A.Ş.").ticker == "MTRKS"
+    assert filtered.resolve("TÜRKİYE GARANTİ BANKASI A.Ş.").ticker is None

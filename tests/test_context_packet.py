@@ -153,3 +153,78 @@ def test_quote_price_must_agree_with_the_rest_of_the_same_disclosure() -> None:
 def test_unrepresentable_scale_is_omitted_not_infinite_or_a_crash() -> None:
     p = sale(PublishedRow(replace(ROW, revenue_ttm=1e-315), AT))
     assert p["sinir"] == "oran_hesaplanamadi" and "olcek" not in p
+
+
+@pytest.mark.parametrize("text", [
+    "Şirketimiz ile ABC Sanayi A.Ş. arasında 60 milyon TL bedelli satış sözleşmesi imzalanmıştır.",
+    "Şirketimiz ile XYZ Ltd. Şti. arasında KDV hariç 60.000.000 TL bedelli satış sözleşmesi imzalanmıştır.",
+    "Şirketimiz, yurt içi müşteriyle 60.000.000 TL + KDV bedelli mal satış sözleşmesi imzalamıştır.",
+    "17.11.2026 tarihinde Şirketimiz ile ABC A.Ş. arasında 60 milyon TL bedelli ihracat sözleşmesi imzalanmıştır.",
+    "Şirketimizce ABC San. ve Tic. A.Ş. ile 60 milyon TL bedelli satış sözleşmesi imzalanmıştır.",
+    "Şirketimiz yurt dışı müşterisinden 60 milyon TL tutarında yeni sipariş almıştır.",
+    "Şirketimiz ile T.C. Sağlık Bakanlığı arasında 60 milyon TL bedelli hizmet satış sözleşmesi imzalanmıştır.",
+    "Şirketimiz ile Türkiye İş Bankası A.Ş. arasında 60 milyon TL bedelli yazılım satış sözleşmesi imzalanmıştır.",
+    "Şirketimiz ile Karayolları Genel Müdürlüğü arasında 60 milyon TL bedelli yapım işi sözleşmesi imzalanmıştır.",
+    "Şirketimiz yurt içinde yerleşik bir firmadan 60 milyon TL bedelli trafo teslimatı işi almıştır.",
+    "Uhdemizde kalan ihale kapsamında 60 milyon TL bedelli satış sözleşmesi Şirketimiz ile idare arasında imzalanmıştır.",
+])
+def test_realistic_turkish_kap_sale_phrasings_preserve_amount_and_scale(text: str) -> None:
+    p = build_packet(ITEM, origin="sentetik", topic="satis_sozlesmesi",
+                     quote=text, detail=detail(text), statements=(VERSION,))
+    assert p["tutar"] == {"deger": "60000000", "birim": "TRY"}
+    assert p["olcek"]["bedel_ciro_yuzde"] == 20.0
+
+
+def test_prior_year_comparison_does_not_block_current_sale_amount() -> None:
+    quote = "Şirketimiz ile ABC A.Ş. arasında 60 milyon TL bedelli satış sözleşmesi imzalanmıştır."
+    body = quote + " Geçen yıl aynı müşteriyle 25 milyon TL tutarında satış yapılmıştı."
+    p = build_packet(ITEM, origin="sentetik", topic="satis_sozlesmesi",
+                     quote=quote, detail=detail(body), statements=(VERSION,))
+    assert p["tutar"] == {"deger": "60000000", "birim": "TRY"}
+    assert p["olcek"]["bedel_ciro_yuzde"] == 20.0
+
+
+def test_negated_cancellation_keeps_valid_sale_while_regulatory_condition_holds() -> None:
+    active_body = QUOTE + " Sözleşme feshedilmemiştir."
+    p = build_packet(ITEM, origin="sentetik", topic="satis_sozlesmesi",
+                     quote=QUOTE, detail=detail(active_body), statements=(VERSION,))
+    assert p["olcek"]["bedel_ciro_yuzde"] == 20.0
+
+    for conditional in (
+        QUOTE + " Sözleşme Rekabet Kurumu iznine tabidir.",
+        QUOTE + " İşbu anlaşma bağlayıcı olmayan niyet mektubu niteliğindedir.",
+        "Şirketimiz ile ABC A.Ş. arasında 60 milyon TL bedelli alım sözleşmesi imzalanmıştır.",
+        "Şirketimiz ile ABC A.Ş. arasında 60 milyon TL bedelli tedarik sözleşmesi imzalanmıştır.",
+        "Şirketimiz tarafından 60 milyon TL bedelli danışmanlık hizmeti işi alınmıştır.",
+    ):
+        q = QUOTE if conditional.startswith(QUOTE) else conditional
+        with pytest.raises(PacketHeld, match="satis_kaniti_yetersiz"):
+            build_packet(ITEM, origin="sentetik", topic="satis_sozlesmesi",
+                         quote=q, detail=detail(conditional))
+
+
+def test_sentence_boundary_blocks_abbreviation_slices_and_allows_paragraph_start() -> None:
+    from bistman.parsing.kap_table import body_text
+    from bistman.sources.kap import parse_detail
+
+    for full, sliced in (
+        ("İddiaların aksine Prof. Dr. Ahmet Yılmaz görevinden ayrılmıştır.",
+         "Ahmet Yılmaz görevinden ayrılmıştır."),
+        ("Başka bir şirket olan Örnek A.Ş. hakkında idari para cezası uygulanmıştır.",
+         "hakkında idari para cezası uygulanmıştır."),
+        ("Matriks Finansal Teknolojiler A.Ş. faaliyetlerine devam etmektedir.",
+         "Matriks Finansal Teknolojiler A.Ş."),
+    ):
+        with pytest.raises(PacketHeld, match="alinti_cumle_sinirinda_degil"):
+            build_packet(ITEM, origin="sentetik", topic="sirket_aciklamasi",
+                         detail=detail(full), quote=sliced)
+
+    # Gerçek MTRKS detayında 'Açıklamalar' başlığından hemen sonraki ilk cümle seçilebilmeli.
+    real_detail = parse_detail((Path(__file__).parent / "fixtures/kap/detail_1699030_live.json").read_bytes())
+    mtrks_text = body_text(real_detail.body_html)
+    first_para = next(line for line in mtrks_text.splitlines() if line.startswith("Son günlerde"))
+    first_sentence = first_para[:first_para.index("verilmiştir.") + len("verilmiştir.")]
+    mtrks_item = ProcessedDisclosure(real_detail.stub, Route.PIPELINE, "no_fundamentals", ticker="MTRKS")
+    pkt = build_packet(mtrks_item, origin="kap_arsiv", topic="sirket_aciklamasi",
+                       detail=real_detail, quote=first_sentence)
+    assert pkt["kanit_yeri"] == "govde" and pkt["kanit"] == first_sentence

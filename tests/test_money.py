@@ -103,3 +103,18 @@ def test_best_amount_prefers_converted_value() -> None:
     money = best_amount("100 milyon TL ve 50 milyon dolar", FX)  # 100M TL vs ~1.7B TL
     assert money is not None
     assert money.currency == "USD"
+
+
+@pytest.mark.parametrize(("text", "expected", "currency"), [
+    ("Sözleşme bedeli 250.000.000.- TL'dir.", Decimal("250000000"), "TRY"),
+    ("Sözleşme bedeli 1.500,- EUR olarak belirlendi.", Decimal("1500"), "EUR"),
+    ("Toplam 12.500.000 CHF tutarında ihracat.", Decimal("12500000"), "CHF"),
+    ("Toplam 5 milyon İsviçre Frangı bedelli sipariş.", Decimal("5000000"), "CHF"),
+    ("Bedel 1,234,567 USD olarak belirlenmiştir.", Decimal("1234567"), "USD"),
+    ("Bedel 12,500.50 USD olarak belirlenmiştir.", Decimal("12500.50"), "USD"),
+])
+def test_kap_dash_notation_chf_and_en_grouped_amounts(
+    text: str, expected: Decimal, currency: str
+) -> None:
+    [money] = find_amounts(text)
+    assert money.amount == expected and money.currency == currency

@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import random
 from collections.abc import Callable
 from datetime import date, datetime
@@ -296,11 +297,17 @@ class KapClient:
         return body_text(detail.body_html), detail
 
 
-def _retry_after_seconds(response: httpx.Response) -> float | None:
+MAX_RETRY_AFTER = 60.0
+
+
+def _retry_after_seconds(response: httpx.Response, *, cap: float = MAX_RETRY_AFTER) -> float | None:
     raw = response.headers.get("Retry-After")
     if not raw:
         return None
     try:
-        return max(0.0, float(raw))
+        value = float(raw)
     except ValueError:
         return None
+    if not math.isfinite(value):
+        return None
+    return min(cap, max(0.0, value))

@@ -158,14 +158,16 @@ def _as_utc(moment: datetime) -> datetime:
 
 def stub_from_row(row: HistoryRow, ticker: str) -> DisclosureStub:
     """Geçmiş satırını hattın beklediği `DisclosureStub`'a çevirir (saat UTC'ye)."""
+    published = _as_utc(row.published_at)
     return DisclosureStub(
         index=row.index,
-        published_at=_as_utc(row.published_at),
+        published_at=published,
         title=row.company_title,
         subject=row.subject,
         summary=row.summary or None,
         disclosure_class=row.disclosure_class,
         tickers=(ticker,),
+        minute_precision=(published.second == 0 and published.microsecond == 0),
     )
 
 

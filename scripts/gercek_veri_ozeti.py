@@ -14,7 +14,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -23,6 +23,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from bistman.analysis.ttm import TTMPoint, compute_ttm  # noqa: E402
 from bistman.notify import FakeNotifier  # noqa: E402
+from bistman.sources.kap import parse_light  # noqa: E402
 from bistman.pipeline import process_batch  # noqa: E402
 from bistman.scoring import ScoringConfig  # noqa: E402
 from bistman.sources.base import DisclosureStub, FundamentalRow  # noqa: E402
@@ -95,12 +96,12 @@ def bolum_karar(cfg: ScoringConfig, resolver: TickerResolver) -> None:
         for etiket, payda in (("yanlış", yanlis_payda), ("doğru", dogru_payda)):
             stub = DisclosureStub(
                 index=abs(hash((subject, etiket))) % 10**7,
-                published_at=datetime(2026, 11, 17, 10, 0),
+                published_at=datetime(2026, 11, 17, 10, 0, tzinfo=timezone.utc),
                 title=title, subject=subject, summary=summary,
                 disclosure_class="ODA", tickers=("THYAO",),
             )
             fund = FundamentalRow(
-                ticker="THYAO", period_end="2026-06-01",
+                ticker="THYAO", period_end="2026-06-30",
                 revenue_ttm=float(payda), net_income_ttm=146.84e9,
             )
             results = asyncio.run(
@@ -133,15 +134,7 @@ def bolum_akis(cfg: ScoringConfig, resolver: TickerResolver) -> None:
 
     # `list_light_sample.json` = 17.11.2026 akışından alınan 9 kayıtlık kesit
     # (`hat_demusu.py` ile aynı; live dosyası 397 kayıt, farklı kesit)
-    raw = json.loads((FIXTURES / "list_light_sample.json").read_text(encoding="utf-8"))
-    stub_list = [
-        DisclosureStub(
-            index=int(item["disclosureIndex"]),
-            published_at=datetime.strptime(item["publishDate"], "%d.%m.%Y %H:%M:%S"),
-            title=item["title"], subject=item["subject"], summary=item.get("summary"),
-        )
-        for item in raw
-    ]
+    stub_list = parse_light((FIXTURES / "list_light_sample.json").read_bytes()).items
     funds = {
         "MTRKS": FundamentalRow(ticker="MTRKS", period_end="2026-09-30",
                                 revenue_ttm=3_200_000_000.0, source="demo"),

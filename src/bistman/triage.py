@@ -86,9 +86,7 @@ _ROUTINE_SUBJECTS: tuple[str, ...] = (
 # DKB içinde mekanik ama bilgi değeri taşımayan kalıplar
 _MECHANICAL_PATTERNS: tuple[str, ...] = (
     "devre kesici",
-    "borçlanma araçları, yatırım fonları ve varant i̇tfa",
     "borçlanma araçları, yatırım fonları ve varant itfa",
-    "varantların veya sertifikaların i̇şlem görmeye başlaması",
     "varantların veya sertifikaların işlem görmeye başlaması",
 )
 
@@ -103,15 +101,21 @@ _DG_ESCALATE: tuple[str, ...] = (
     "temettü",
 )
 
-# DKB olmasına rağmen ÖNEMLİ olan istisnalar (SPK II-15.1 md.12-4 duyurusu vb.)
+# DKB olmasına rağmen ÖNEMLİ olan istisnalar (SPK II-15.1 md.12-4 duyurusu, VBTS, sıra kapatma vb.)
 _IMPORTANT_DKB_PATTERNS: tuple[str, ...] = (
     "kamuyu aydınlatma platformu duyurusu",
-    # Gerçek geçmiş tablosunda görüldü (MTRKS, 30.12.2025): işlem yasağı bir
-    # piyasa olayı, mekanik gürültü değil.
-    "i̇şlem yasağı",
+    # Gerçek geçmiş tablosunda görüldü (MTRKS, 30.12.2025): işlem yasağı / VBTS /
+    # pay sırasının kapatılması piyasa olayıdır, mekanik gürültü değil.
     "işlem yasağı",
     "işlem yasagi",
     "tedbir kararı",
+    "volatilite bazlı tedbir",
+    "vbts",
+    "işleme kapatılma",
+    "işleme açılma",
+    "işlem sırasının durdurulma",
+    "işlem sırasının yeniden açılma",
+    "brüt takas",
 )
 
 

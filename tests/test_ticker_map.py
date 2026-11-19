@@ -81,3 +81,28 @@ def test_ascii_fold_collision_is_refused() -> None:
     res = r.resolve("ŞİŞE CAM A.Ş.")
     assert res.method == "ambiguous"
     assert res.ticker is None
+
+
+def test_unlisted_subsidiaries_and_duplicate_roots_do_not_match_parent_stock() -> None:
+    """Aynı grubun halka açık olmayan bağlı ortaklıkları ana hisseye yazılamaz."""
+    bist = TickerResolver.from_pairs([
+        ("ENJSA", "ENERJİSA ENERJİ A.Ş."),
+        ("ZOREN", "ZORLU ENERJİ ELEKTRİK ÜRETİM A.Ş."),
+        ("TCELL", "TURKCELL İLETİŞİM HİZMETLERİ A.Ş."),
+        ("YKBNK", "YAPI VE KREDİ BANKASI A.Ş."),
+        ("GARAN", "TÜRKİYE GARANTİ BANKASI A.Ş."),
+        ("ARCLK", "ARÇELİK A.Ş."),
+        ("THYAO", "TÜRK HAVA YOLLARI A.O."),
+    ])
+    for outsider in (
+        "ENERJİSA ÜRETİM SANTRALLERİ ENERJİ A.Ş.",
+        "TURKCELL FİNANSMAN İLETİŞİM HİZMETLERİ A.Ş.",
+        "ZORLU YENİLENEBİLİR ENERJİ ELEKTRİK ÜRETİM A.Ş.",
+        "YAPI KREDİ BANKASI AZERBAYCAN",
+        "TÜRKİYE GARANTİ BANKASI EMEKLİ SANDIĞI",
+        "ARÇELİK PAZARLAMA A.Ş.",
+        "ENERJİ ENERJİSİ MADENCİLİK A.Ş.",
+    ):
+        assert bist.resolve(outsider).ticker is None, outsider
+    assert bist.has_ticker("enjsa") is True
+    assert bist.has_ticker("ANKARA") is False

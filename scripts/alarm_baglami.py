@@ -1,4 +1,4 @@
-"""Arşivi bir kere hazırla, yalnız dış alarm geldiğinde sorgula. İki komut da ağsız."""
+"""Arşivi hazırla veya güncelle, yalnız dış alarm geldiğinde salt okunur sorgula."""
 
 from __future__ import annotations
 
@@ -34,10 +34,46 @@ def load_demo(path: Path) -> dict:
             # kanıtı KAP yayını anında kullanılabilir varsayıyoruz.
             result = archive.record(item, origin=case.origin, topic=case.topic, quote=case.quote,
                                     detail=case.detail, known_at=case.stub.published_at,
+                                    replay=True,
                                     reviewed=case.reference if case.topic == "sirket_aciklamasi" else None)
             counts[result] += 1
     return {"arsiv_kesiti": "17.11.2026", "incelenen": len(selected), "sonuclar": dict(counts),
             "varsayim": "Yalnız demoda ilk kullanılabilir an = KAP yayını; alım gecikmesi ölçülmedi."}
+
+
+async def _scan_live_async(
+    path: Path, universe_file: Path | None, probe_limit: int, warmup: bool,
+) -> dict:
+    from bistman.collector import KapCollectorService
+
+    universe: list[str] | None = None
+    if universe_file is not None:
+        universe = [
+            line.strip().upper()
+            for line in universe_file.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
+
+    service = KapCollectorService(
+        path,
+        universe=universe,
+        probe_opaque=True,
+        probe_unresolved=probe_limit > 0,
+        max_unresolved_probes=max(25, probe_limit) if probe_limit > 0 else 30,
+    )
+    if warmup and universe:
+        await service.warmup(universe)
+    report = await service.run_once()
+    return {
+        "toplam_satir": report.total_rows,
+        "reddedilen_satir": report.rejected_rows,
+        "detay_istegi": report.detail_requests,
+        "denetlenmemis_kurum_satiri": report.unprobed_opaque,
+        "sonuclar": report.counts,
+        "mali_tablo_yenileme_adaylari": list(report.fundamentals_refresh),
+        "son_tarama": report.scanned_until.isoformat() if report.scanned_until else None,
+        "supheli_bos": report.suspicious_empty,
+    }
 
 
 def main() -> None:
@@ -45,6 +81,13 @@ def main() -> None:
     commands = parser.add_subparsers(dest="command", required=True)
     seed = commands.add_parser("hazirla-demo", help="yerel, incelenmiş KAP örneklerini yükle (canlı veri değil)")
     seed.add_argument("arsiv", type=Path)
+    scan = commands.add_parser("tara-canli", help="KAP listesini tek tur sessizce tara ve arşivi güncelle")
+    scan.add_argument("arsiv", type=Path)
+    scan.add_argument("--evren", type=Path, default=None, help="isteğe bağlı hisse listesi dosyası (satır başına kod)")
+    scan.add_argument("--kimlik-kontrol-siniri", type=int, default=0,
+                      help="unvanı eşleşmeyen adaylar için en çok detay kontrol sayısı")
+    scan.add_argument("--isindir", action="store_true",
+                      help="--evren hisseleri için son 7 günlük üye geçmişini de tara")
     query = commands.add_parser("sorgula", help="mevcut arşivden tek alarm için JSON oku")
     query.add_argument("arsiv", type=Path)
     query.add_argument("hisse")
@@ -53,6 +96,16 @@ def main() -> None:
     try:
         if args.command == "hazirla-demo":
             result = load_demo(args.arsiv)
+        elif args.command == "tara-canli":
+            from bistman.sources.kap import KapError
+            from bistman.sources.kap_companies import CompanyMapError
+
+            try:
+                result = asyncio.run(
+                    _scan_live_async(args.arsiv, args.evren, args.kimlik_kontrol_siniri, args.isindir)
+                )
+            except (KapError, CompanyMapError) as exc:
+                parser.exit(2, f"Hata: {exc}\n")
         else:
             with open_archive(args.arsiv) as archive:
                 result = archive.alarm_baglami(args.hisse, args.alarm_zamani)

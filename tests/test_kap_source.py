@@ -263,3 +263,12 @@ def test_detail_body_schema_drift_is_not_joined_character_by_character() -> None
     entry["disclosureBody"] = "60 milyon TL"
     with pytest.raises(KapParseError, match="disclosureBody"):
         parse_detail(json.dumps([entry]))
+
+
+def test_retry_after_header_is_bounded_and_rejects_non_finite() -> None:
+    from bistman.sources.kap import MAX_RETRY_AFTER, _retry_after_seconds
+
+    assert _retry_after_seconds(httpx.Response(429, headers={"Retry-After": "86400"})) == MAX_RETRY_AFTER
+    assert _retry_after_seconds(httpx.Response(429, headers={"Retry-After": "3"})) == 3.0
+    assert _retry_after_seconds(httpx.Response(429, headers={"Retry-After": "nan"})) is None
+    assert _retry_after_seconds(httpx.Response(429, headers={"Retry-After": "inf"})) is None

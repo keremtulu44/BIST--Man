@@ -30,6 +30,7 @@ olmaz (KAP istemcisinin aksine burada HTTP/2, retry-after gibi ihtiyaçlar yok).
 from __future__ import annotations
 
 import asyncio
+import calendar
 import json
 import ssl
 import urllib.error
@@ -249,7 +250,11 @@ class IsYatirimClient:
             ticker, statement_type=statement_type, periods=years_back(4, today)
         )
         latest = max((p for item in quarterly for p in item.values), default=None)
-        period_end = f"{latest[0]}-{latest[1]:02d}-01" if latest else ""
+        if latest:
+            last_day = calendar.monthrange(latest[0], latest[1])[1]
+            period_end = f"{latest[0]}-{latest[1]:02d}-{last_day:02d}"
+        else:
+            period_end = ""
 
         return fundamentals_from_items(
             ticker=ticker.upper(),

@@ -34,15 +34,31 @@ CURRENCY = {
     "usd": "USD", "dolar": "USD", "$": "USD", "abd doları": "USD",
     "eur": "EUR", "euro": "EUR", "€": "EUR", "avro": "EUR",
     "gbp": "GBP", "sterlin": "GBP", "£": "GBP",
+    "chf": "CHF", "isviçre frangı": "CHF",
+    "jpy": "JPY", "japon yeni": "JPY",
+    "cny": "CNY", "yuan": "CNY",
+    "rub": "RUB", "ruble": "RUB",
+    "sar": "SAR", "aed": "AED", "cad": "CAD", "aud": "AUD",
     "₤": "UNKNOWN",  # genel lira işareti, TRY varsayma
 }
 
-# Sıra KRİTİK: binlik-gruplu -> EN ondalık -> TR ondalık -> düz.
+# Sıra KRİTİK: TR binlik-gruplu -> EN virgül-gruplu -> EN ondalık -> TR ondalık -> düz.
 # EN ondalık, "3.5 milyar"daki "3.5"i yakalayabilmek için düz sayıdan ÖNCE gelir;
 # aksi hâlde motor "3"ü eşleyip ".5 milyar"ı atlar ve tutarı 5 milyar okur.
-_NUM = r"(?:\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+\.\d{1,2}|\d+(?:,\d+)?)"
+# EN virgül-gruplu ("1,234,567 USD", "12,500.50 USD") en az iki virgül grubu
+# veya virgül+nokta ondalık ister; böylece TR ondalık ("1,250 milyar") bozulmaz.
+_NUM = (
+    r"(?:\d{1,3}(?:\.\d{3})+(?:,\d+)?"
+    r"|\d{1,3}(?:,\d{3}){2,}(?:\.\d{1,2})?"
+    r"|\d{1,3}(?:,\d{3})+\.\d{1,2}"
+    r"|\d+\.\d{1,2}"
+    r"|\d+(?:,\d+)?)"
+)
 _MAG = "(?:" + "|".join(MAGNITUDE) + ")"
-_CUR = "(?:" + "|".join(re.escape(k).replace(r"\ ", r"\s+") for k in CURRENCY) + ")"
+# Uzundan kısaya sırala ki "türk lirası" / "isviçre frangı" kısaltmaya takılmasın.
+_CUR = "(?:" + "|".join(
+    re.escape(k).replace(r"\ ", r"\s+") for k in sorted(CURRENCY, key=len, reverse=True)
+) + ")"
 
 
 def _unit_key(token: str) -> str:
@@ -54,17 +70,22 @@ _CURRENCY_BY_KEY = {_unit_key(k): v for k, v in CURRENCY.items()}
 
 # Yüzdeleri aynı taramada tüket: metinden silmek hem ofsetleri kaydırır hem
 # de yüzde ifadesinin iki yanındaki bağımsız sayı ve para birimini birleştirir.
+# `(?P<dash>[.,]-)` KAP metinlerindeki "250.000.000.- TL" / "1.500,- TL" yazımını destekler.
 MONEY_RE = re.compile(
     rf"(?P<percent>(?:%\s*|\byüzde\s+){_NUM})|"
-    rf"(?<![\w.,])(?:(?P<curpre>{_CUR})\s*)?(?P<num>{_NUM})"
+    rf"(?<![\w.,])(?:(?P<curpre>{_CUR})\s*)?(?P<num>{_NUM})(?:[.,]-)?"
     rf"(?:\s*(?P<mag>{_MAG}))?(?:\s*(?P<cur>{_CUR}))?(?!\w|[.,]\d)",
     re.IGNORECASE,
 )
 
 # "1.234.567,89 TL" gibi binlik gruplu sayı
 _GROUPED = re.compile(r"\d{1,3}(?:\.\d{3})+(?:,\d+)?")
+# "1,234,567" veya "12,500.50" -> EN virgül gruplu sayı
+_EN_GROUPED = re.compile(r"\d{1,3}(?:,\d{3}){2,}(?:\.\d{1,2})?|\d{1,3}(?:,\d{3})+\.\d{1,2}")
 # "1234,56" -> virgül ondalık (TR)
 _TR_DECIMAL = re.compile(r"\d+,\d+")
+# "1,250" / "12,500" -> büyüklük kelimesi olmadan tek virgül + 3 hane (EN binlik / TR ondalık belirsizliği)
+_AMBIGUOUS_COMMA_THOUSAND = re.compile(r"[1-9]\d{0,2},\d{3}")
 # "3.5" -> nokta ondalık (EN sızması); binlik grubu DEĞİL
 _EN_DECIMAL = re.compile(r"\d+\.\d{1,2}")
 _PLAIN = re.compile(r"\d+")
@@ -103,6 +124,9 @@ def _parse_number(tok: str) -> tuple[Decimal, tuple[str, ...]]:
     if _GROUPED.fullmatch(tok):
         # 1.234.567 veya 1.234.567,89
         return Decimal(tok.replace(".", "").replace(",", ".")), ()
+    if _EN_GROUPED.fullmatch(tok):
+        warns.append(f"en_format_grouped:{tok}")
+        return Decimal(tok.replace(",", "")), tuple(warns)
     if _TR_DECIMAL.fullmatch(tok):
         return Decimal(tok.replace(",", ".")), ()
     if _EN_DECIMAL.fullmatch(tok):
@@ -130,6 +154,11 @@ def find_amounts(text: str) -> list[Money]:
     for m in MONEY_RE.finditer(text):
         if m.group("percent"):
             continue
+        # Bitişik eksi işareti ("-50 milyon TL", "−1.250 USD"): pozitif tutar gibi okuma.
+        m_start = m.start()
+        if m_start > 0 and text[m_start - 1] in "-−":
+            if m_start == 1 or not text[m_start - 2].isalnum():
+                continue
         num_tok = m.group("num")
         mag_tok = _unit_key(m.group("mag") or "")
         cur_tok = _unit_key(m.group("cur") or m.group("curpre") or "")
@@ -151,6 +180,8 @@ def find_amounts(text: str) -> list[Money]:
         # Para birimi yok ama büyüklük var -> "15 milyar" (TL varsayımı
         # yapma, işaretle; FX kararı çağıran katmanın)
         warns_list = list(warns)
+        if not mag_tok and _AMBIGUOUS_COMMA_THOUSAND.fullmatch(num_tok):
+            warns_list.append(f"belirsiz_virgul_binlik:{num_tok}")
         if currency == "UNKNOWN":
             warns_list.append("para_birimi_yok")
 

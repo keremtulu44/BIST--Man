@@ -176,7 +176,7 @@ def test_missing_market_cap_is_flagged(row) -> None:
 
 
 def test_period_end_from_latest_observation(row) -> None:
-    assert row.period_end == "2026-06-01"
+    assert row.period_end == "2026-06-30"
 
 
 def test_bank_template_uses_ufrs_group() -> None:
@@ -188,3 +188,10 @@ def test_bank_template_uses_ufrs_group() -> None:
 
 def test_source_is_labelled(row) -> None:
     assert row.source == "isyatirim/malitablo"
+
+
+def test_satis_hasilati_label_matches_at_full_score() -> None:
+    from bistman.sources.isyatirim_labels import select_row
+
+    pick = select_row(["Diğer Gelirler", "Satış Hasılatı"], "revenue")
+    assert pick is not None and pick.label == "Satış Hasılatı" and pick.score >= 8
